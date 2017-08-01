@@ -184,6 +184,8 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"pods/proxy":       podStorage.Proxy,
 		"pods/binding":     podStorage.Binding,
 		"bindings":         podStorage.Binding,
+		"pods/resizing":    podStorage.Resizing,
+		"resizings":        podStorage.Resizing,
 
 		"podTemplates": podTemplateStorage,
 

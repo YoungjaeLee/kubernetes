@@ -98,6 +98,17 @@ func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.T
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	defer c.notify(id, timestamp)
+	// To check whether the containers inside the pod have been resized.
+	oldData := c.get(id)
+	oldStatus := oldData.status
+	for idx, oldContainerStatus := range oldStatus.ContainerStatuses {
+		if idx < len(status.ContainerStatuses) {
+			if !oldContainerStatus.Resources.IsEqual(status.ContainerStatuses[idx].Resources) {
+				status.ContainerStatuses[idx].RState = ContainerStateResized
+				status.ContainerStatuses[idx].ResizedAt = time.Now()
+			}
+		}
+	}
 	c.pods[id] = &data{status: status, err: err, modified: timestamp}
 }
 

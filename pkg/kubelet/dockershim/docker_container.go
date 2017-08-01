@@ -254,6 +254,19 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 	return ds.client.StopContainer(containerID, time.Duration(timeout)*time.Second)
 }
 
+func (ds *dockerService) UpdateContainer(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	updateConfig := dockercontainer.UpdateConfig{}
+	updateConfig.Resources = dockercontainer.Resources{
+		CPUShares: resources.CpuShares,
+		CPUPeriod: resources.CpuPeriod,
+		CPUQuota:  resources.CpuQuota,
+		Memory:    resources.MemoryLimitInBytes,
+	}
+	err := ds.client.UpdateContainer(containerID, updateConfig)
+
+	return err
+}
+
 // RemoveContainer removes the container.
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
@@ -373,7 +386,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	if len(ir.RepoTags) > 0 {
 		imageName = ir.RepoTags[0]
 	}
-	return &runtimeapi.ContainerStatus{
+	ret := &runtimeapi.ContainerStatus{
 		Id:          r.ID,
 		Metadata:    metadata,
 		Image:       &runtimeapi.ImageSpec{Image: imageName},
@@ -389,7 +402,10 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Labels:      labels,
 		Annotations: annotations,
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
-	}, nil
+		Resources:   &runtimeapi.LinuxContainerResources{CpuPeriod: r.HostConfig.CPUPeriod, CpuQuota: r.HostConfig.CPUQuota, CpuShares: r.HostConfig.CPUShares, MemoryLimitInBytes: r.HostConfig.Memory, OomScoreAdj: int64(r.HostConfig.OomScoreAdj)},
+	}
+
+	return ret, nil
 }
 
 func (ds *dockerService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {

@@ -198,6 +198,37 @@ func NewConfigFactory(
 			},
 		},
 	)
+	// resize-requested pod queue
+	podInformer.Informer().AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Pod:
+					return resizeRequestedNonTerminatedPod(t)
+				default:
+					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					if err := c.podQueue.Add(obj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
+					}
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					if err := c.podQueue.Update(newObj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					if err := c.podQueue.Delete(obj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
+					}
+				},
+			},
+		},
+	)
 	// unscheduled pod queue
 	podInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
@@ -943,6 +974,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NodeLister:          &nodeLister{f.nodeLister},
 		Algorithm:           algo,
 		Binder:              f.getBinder(extenders),
+		Resizer:             &podResizer{f.client},
 		PodConditionUpdater: &podConditionUpdater{f.client},
 		PodPreemptor:        &podPreemptor{f.client},
 		WaitForCacheSync: func() bool {
@@ -1044,6 +1076,23 @@ func assignedNonTerminatedPod(pod *v1.Pod) bool {
 		return false
 	}
 	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return false
+	}
+	return true
+}
+
+// resizeRequestedNonTerminatedPod selects pods that have been resize-requested and non-terminal (scheduled and resized)
+func resizeRequestedNonTerminatedPod(pod *v1.Pod) bool {
+	if len(pod.Spec.NodeName) == 0 {
+		return false
+	}
+	if pod.Status.Phase != v1.PodRunning {
+		return false
+	}
+	if pod.Spec.ResizeRequest.RequestStatus != v1.ResizeRequested {
+		return false
+	}
+	if pod.DeletionTimestamp != nil {
 		return false
 	}
 	return true
@@ -1194,6 +1243,9 @@ func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 							factory.volumeBinder.DeletePodBindings(pod)
 						}
 					}
+					if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+						podQueue.AddIfNotPresent(pod)
+					}
 					break
 				}
 				if errors.IsNotFound(err) {
@@ -1241,6 +1293,15 @@ type binder struct {
 func (b *binder) Bind(binding *v1.Binding) error {
 	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
+}
+
+type podResizer struct {
+	Client clientset.Interface
+}
+
+func (p *podResizer) Resize(resizing *v1.Resizing) (*v1.Pod, error) {
+	glog.V(2).Infof("Updating pod resizing result for %s/%s - %v", resizing.Namespace, resizing.Name, resizing.Request)
+	return p.Client.CoreV1().Pods(resizing.Namespace).Resize(resizing)
 }
 
 type podConditionUpdater struct {

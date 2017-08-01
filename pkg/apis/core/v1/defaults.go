@@ -41,6 +41,10 @@ func SetDefaults_ResourceList(obj *v1.ResourceList) {
 	}
 }
 
+func SetDefaults_ResizePolicyList(obj *v1.ResizePolicyList) {
+	// TODO See SetDefaults_Pod
+}
+
 func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	var labels map[string]string
 	if obj.Spec.Template != nil {
@@ -144,6 +148,17 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
+		// If requests are specified, but the corresponding resizing policies are not, default the policies to "Disabled"
+		if obj.Spec.Containers[i].Resources.Requests != nil {
+			if obj.Spec.Containers[i].Resources.ResizePolicy == nil {
+				obj.Spec.Containers[i].Resources.ResizePolicy = make(v1.ResizePolicyList)
+			}
+			for key, _ := range obj.Spec.Containers[i].Resources.Requests {
+				if obj.Spec.Containers[i].Resources.ResizePolicy[key] == "" {
+					obj.Spec.Containers[i].Resources.ResizePolicy[key] = v1.ResizeDisabled
+				}
+			}
+		}
 	}
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {
@@ -156,6 +171,19 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
+		if obj.Spec.InitContainers[i].Resources.Requests != nil {
+			if obj.Spec.InitContainers[i].Resources.ResizePolicy == nil {
+				obj.Spec.InitContainers[i].Resources.ResizePolicy = make(v1.ResizePolicyList)
+			}
+			for key, _ := range obj.Spec.InitContainers[i].Resources.Requests {
+				if obj.Spec.InitContainers[i].Resources.ResizePolicy[key] == "" {
+					obj.Spec.InitContainers[i].Resources.ResizePolicy[key] = v1.ResizeDisabled
+				}
+			}
+		}
+	}
+	if obj.Spec.ResizeRequest.RequestStatus == v1.ResizeStatus("") {
+		obj.Spec.ResizeRequest.RequestStatus = v1.ResizeNone
 	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {

@@ -376,6 +376,11 @@ type podActions struct {
 	// the key is the container ID of the container, while
 	// the value contains necessary information to kill a container.
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
+
+	// ContainersToResize keeps a map of containers that need to be resized as is, note that
+	// the key is the container ID of the container, while
+	// the value is index of the container inside pod.Spec.Containers
+	ContainersToResize map[kubecontainer.ContainerID]int
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -420,9 +425,40 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
 }
 
-func containerChanged(container *v1.Container, containerStatus *kubecontainer.ContainerStatus) (uint64, uint64, bool) {
-	expectedHash := kubecontainer.HashContainer(container)
-	return expectedHash, containerStatus.Hash, containerStatus.Hash != expectedHash
+func containerChanged(container *v1.Container, containerStatus *kubecontainer.ContainerStatus) (uint64, uint64, bool, bool) {
+	needToRestart := false
+	liveResizable := false
+
+	if containerStatus.HashNoResources == 0 {
+		expectedHash := kubecontainer.HashContainer(&container)
+		needToRestart = containerStatus.Hash != expectedHash
+		return expectedHash, containerStatus.Hash, needToRestart, liveResizable
+	} else {
+		mungedContainer := container
+		mungedContainer.Resources = v1.ResourceRequirements{}
+		expectedHashNoResources := kubecontainer.HashContainer(&mungedContainer)
+		needToRestart = containerStatus.HashNoResources != expectedHashNoResources
+
+		if needToRestart == false {
+			newLC := m.generateLinuxContainerResources(&container, pod)
+			if changed, restartNeeded := containerStatus.Resources.ComputeResourceChanges(newLC); len(changed) > 0 {
+				for resource, _ := range changed {
+					if container.Resources.ResizePolicy[resource] == v1.ResizeRestartOnly {
+						needToRestart = true
+					}
+					if restartNeeded[resource] {
+						// It is the case to unset some cgroup values.
+						// docker update doesn't support to unset a cgroup value.
+						needToRestart = true
+					}
+				}
+				if needToRestart == false {
+					liveResizable = true
+				}
+			}
+		}
+	}
+	return expectedHashNoResources, containerStatus.HashNoResources, needToRestart, liveResizable
 }
 
 func shouldRestartOnFailure(pod *v1.Pod) bool {
@@ -443,12 +479,13 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
 	changes := podActions{
-		KillPod:           createPodSandbox,
-		CreateSandbox:     createPodSandbox,
-		SandboxID:         sandboxID,
-		Attempt:           attempt,
-		ContainersToStart: []int{},
-		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
+		KillPod:            createPodSandbox,
+		CreateSandbox:      createPodSandbox,
+		SandboxID:          sandboxID,
+		Attempt:            attempt,
+		ContainersToStart:  []int{},
+		ContainersToKill:   make(map[kubecontainer.ContainerID]containerToKillInfo),
+		ContainersToResize: make(map[kubecontainer.ContainerID]int),
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -519,7 +556,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// The container is running, but kill the container if any of the following condition is met.
 		reason := ""
 		restart := shouldRestartOnFailure(pod)
-		if expectedHash, actualHash, changed := containerChanged(&container, containerStatus); changed {
+		if expectedHash, actualHash, changed, liveResizable := containerChanged(&container, containerStatus); changed {
 			reason = fmt.Sprintf("Container spec hash changed (%d vs %d).", actualHash, expectedHash)
 			// Restart regardless of the restart policy because the container
 			// spec changed.
@@ -530,6 +567,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		} else {
 			// Keep the container.
 			keepCount += 1
+			if liveResizable {
+				changes.ContainersToResize[containerStatus.ID] = idx
+			}
 			continue
 		}
 
@@ -734,6 +774,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 				utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			}
 			continue
+		}
+	}
+
+	for containerId, idx := range podContainerChanges.ContainersToResize {
+		container := &pod.Spec.Containers[idx]
+		updateContainerResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, container.Name)
+		result.AddSyncResult(updateContainerResult)
+
+		if msg, err := m.updateContainer(containerId, container, pod); err != nil {
+			updateContainerResult.Fail(err, msg)
+		} else {
+			// After updateContainer, it updates PodStatusCache for the pod resized here.
+			// The current PLEG that is responsible for updating PodCache can't detect container resizing by docker update.
+			// since the docker currently doesn't care about docker update in the terms of the container status.
+			// cf. See g.relist in pkg/kubelet/pleg/generic.go
+			if err := m.runtimeHelper.UpdatePodStatusCache(pod); err != nil {
+				glog.Errorf("UpdatePodStatusCache failed for a pod(%s/%s): %v", pod.Namespace, pod.Name, err)
+			}
 		}
 	}
 

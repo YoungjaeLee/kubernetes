@@ -138,6 +138,14 @@ func (d *dockerService) ListContainers(ctx context.Context, r *runtimeapi.ListCo
 	return &runtimeapi.ListContainersResponse{Containers: containers}, nil
 }
 
+func (d *dockerService) UpdateContainer(ctx context.Context, r *runtimeapi.UpdateContainerRequest) (*runtimeapi.UpdateContainerResponse, error) {
+	err := d.runtimeService.UpdateContainer(r.ContainerId, r.Resources)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.UpdateContainerResponse{}, nil
+}
+
 func (d *dockerService) ContainerStatus(ctx context.Context, r *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
 	status, err := d.runtimeService.ContainerStatus(r.ContainerId)
 	if err != nil {

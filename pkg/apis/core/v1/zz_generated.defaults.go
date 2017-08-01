@@ -53,6 +53,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) {
 		SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList))
 	})
+	scheme.AddTypeDefaultingFunc(&v1.Resizing{}, func(obj interface{}) { SetObjectDefaults_Resizing(obj.(*v1.Resizing)) })
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*v1.ResourceQuota)) })
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*v1.ResourceQuotaList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*v1.Secret)) })
@@ -152,6 +153,7 @@ func SetObjectDefaults_PersistentVolumeClaim(in *v1.PersistentVolumeClaim) {
 	SetDefaults_PersistentVolumeClaim(in)
 	SetDefaults_ResourceList(&in.Spec.Resources.Limits)
 	SetDefaults_ResourceList(&in.Spec.Resources.Requests)
+	SetDefaults_ResizePolicyList(&in.Spec.Resources.ResizePolicy)
 	SetDefaults_ResourceList(&in.Status.Capacity)
 }
 
@@ -237,6 +239,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		SetDefaults_ResourceList(&a.Resources.Limits)
 		SetDefaults_ResourceList(&a.Resources.Requests)
+		SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -279,6 +282,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		SetDefaults_ResourceList(&a.Resources.Limits)
 		SetDefaults_ResourceList(&a.Resources.Requests)
+		SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -303,6 +307,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.ResizeRequest.NewResources[i]
+		SetDefaults_ResourceList(&a.Limits)
+		SetDefaults_ResourceList(&a.Requests)
+		SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -380,6 +390,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		SetDefaults_ResourceList(&a.Resources.Limits)
 		SetDefaults_ResourceList(&a.Resources.Requests)
+		SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -422,6 +433,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		SetDefaults_ResourceList(&a.Resources.Limits)
 		SetDefaults_ResourceList(&a.Resources.Requests)
+		SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -446,6 +458,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				}
 			}
 		}
+	}
+	for i := range in.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Template.Spec.ResizeRequest.NewResources[i]
+		SetDefaults_ResourceList(&a.Limits)
+		SetDefaults_ResourceList(&a.Requests)
+		SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -525,6 +543,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+			SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 			if a.LivenessProbe != nil {
 				SetDefaults_Probe(a.LivenessProbe)
 				if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -567,6 +586,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+			SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 			if a.LivenessProbe != nil {
 				SetDefaults_Probe(a.LivenessProbe)
 				if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -592,6 +612,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				}
 			}
 		}
+		for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+			a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+			SetDefaults_ResourceList(&a.Limits)
+			SetDefaults_ResourceList(&a.Requests)
+			SetDefaults_ResizePolicyList(&a.ResizePolicy)
+		}
 	}
 }
 
@@ -599,6 +625,15 @@ func SetObjectDefaults_ReplicationControllerList(in *v1.ReplicationControllerLis
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicationController(a)
+	}
+}
+
+func SetObjectDefaults_Resizing(in *v1.Resizing) {
+	for i := range in.Request.NewResources {
+		a := &in.Request.NewResources[i]
+		SetDefaults_ResourceList(&a.Limits)
+		SetDefaults_ResourceList(&a.Requests)
+		SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 

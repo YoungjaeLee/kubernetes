@@ -30,6 +30,10 @@ func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
 
+func (m *podContainerManagerStub) Update(_ *v1.Pod) error {
+	return nil
+}
+
 func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
 	return nil
 }

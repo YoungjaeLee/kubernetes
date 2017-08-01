@@ -104,6 +104,7 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -146,6 +147,7 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -170,6 +172,12 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -247,6 +255,7 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -289,6 +298,7 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -313,5 +323,11 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 				}
 			}
 		}
+	}
+	for i := range in.Template.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Template.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }

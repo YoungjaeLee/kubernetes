@@ -34,6 +34,7 @@ const (
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
 	containerHashLabel                     = "io.kubernetes.container.hash"
+	containerHashNoResourcesLabel          = "io.kubernetes.container.hashNoResources"
 	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
 	containerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
@@ -63,6 +64,7 @@ type labeledContainerInfo struct {
 
 type annotatedContainerInfo struct {
 	Hash                      uint64
+	HashNoResources           uint64
 	RestartCount              int
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
@@ -111,6 +113,10 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
+
+	mungedContainer := *container
+	mungedContainer.Resources = v1.ResourceRequirements{}
+	annotations[containerHashNoResourcesLabel] = strconv.FormatUint(kubecontainer.HashContainer(&mungedContainer), 16)
 
 	if pod.DeletionGracePeriodSeconds != nil {
 		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
@@ -187,6 +193,9 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
 		glog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
+	}
+	if containerInfo.HashNoResources, err = getUint64ValueFromLabel(annotations, containerHashNoResourcesLabel); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", containerHashNoResourcesLabel, annotations, err)
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
 		glog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)

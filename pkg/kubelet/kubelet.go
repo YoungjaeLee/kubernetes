@@ -1197,6 +1197,14 @@ func allLocalIPsWithoutLoopback() ([]net.IP, error) {
 	return ips, nil
 }
 
+func (kl *Kubelet) UpdatePodStatusCache(pod *v1.Pod) error {
+	kubecontainer_pod := &kubecontainer.Pod{ID: pod.UID, Name: pod.Name}
+
+	err := kl.pleg.UpdateCache(kubecontainer_pod, pod.UID)
+
+	return err
+}
+
 // setupDataDirs creates:
 // 1.  the root directory
 // 2.  the pods directory
@@ -1606,6 +1614,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
+	for _, syncResult := range result.SyncResults {
+		if syncResult.Action == kubecontainer.UpdateContainer && syncResult.Error == nil {
+			// The pod might have been resized, so it needs to update its cgroup.
+			if err := pcm.Update(pod); err != nil {
+				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
+		}
+	}
 	if err := result.Error(); err != nil {
 		// Do not record an event here, as we keep all event logging for sync pod failures
 		// local to container runtime so we get better errors

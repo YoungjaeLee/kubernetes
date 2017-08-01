@@ -2070,6 +2070,9 @@ type ResourceRequirements struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
 	// +optional
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+	// ResizePolicyList describes the policy for each resource on how to deal with a reqeust to resize the resource.
+	// it defaults to "Disabled"
+	ResizePolicy ResizePolicyList `json:"resizePolicy,omitempty" protobuf:"bytes,3,rep,name=resizePolicy,casttype=ResizePolicyList,castkey=ResourceName"`
 }
 
 const (
@@ -2271,9 +2274,13 @@ type ConditionStatus string
 // can't decide if a resource is in the condition or not. In the future, we could add other
 // intermediate conditions, e.g. ConditionDegraded.
 const (
-	ConditionTrue    ConditionStatus = "True"
-	ConditionFalse   ConditionStatus = "False"
-	ConditionUnknown ConditionStatus = "Unknown"
+	ConditionTrue      ConditionStatus = "True"
+	ConditionFalse     ConditionStatus = "False"
+	ConditionRequested ConditionStatus = "Requested"
+	ConditionAccepted  ConditionStatus = "Accepted"
+	ConditionRejected  ConditionStatus = "Rejected"
+	ConditionDone      ConditionStatus = "Done"
+	ConditionUnknown   ConditionStatus = "Unknown"
 )
 
 // ContainerStateWaiting is a waiting state of a container.
@@ -2317,6 +2324,10 @@ type ContainerStateTerminated struct {
 	ContainerID string `json:"containerID,omitempty" protobuf:"bytes,7,opt,name=containerID"`
 }
 
+type ContainerStateResized struct {
+	ResizedAt metav1.Time `json:"resizedAt,omitempty" protobuf:"bytes,1,opt,name=resizedAt"`
+}
+
 // ContainerState holds a possible state of container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
@@ -2330,6 +2341,9 @@ type ContainerState struct {
 	// Details about a terminated container
 	// +optional
 	Terminated *ContainerStateTerminated `json:"terminated,omitempty" protobuf:"bytes,3,opt,name=terminated"`
+	// Details about a resized container
+	// +optional
+	Resized *ContainerStateResized `json:"resized,omitempty" protobuf:"bytes,4,opt,name=resized"`
 }
 
 // ContainerStatus contains details for the current status of this container.
@@ -2396,9 +2410,12 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
+	PodResized     PodConditionType = "PodResized"
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	PodReasonUnresizable   = "Unresizable"
+	PodReasonResizerFailed = "ResizerFailed"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -2898,7 +2915,8 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
-	DNSConfig *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
+	DNSConfig     *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
+	ResizeRequest ResizeRequest `json:"resizeRequest,omitempty" protobuf:"bytes,27,opt,name=resizeRequest"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -4021,6 +4039,41 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
+// ResizePolicy is the name identifying various policies in ResizePolicyList.
+type ResizePolicyName string
+
+const (
+	ResizeDisabled       ResizePolicyName = "Disabled"
+	ResizeRestartOnly    ResizePolicyName = "RestartOnly"
+	ResizeLiveResizeable ResizePolicyName = "LiveResizeable"
+)
+
+// ResizePolicyList is a set of (resource name, resize policy) pairs
+type ResizePolicyList map[ResourceName]ResizePolicyName
+
+type ResizeStatus string
+
+const (
+	ResizeRequested ResizeStatus = "Requested"
+	ResizeAccepted  ResizeStatus = "Accepted"
+	ResizeRejected  ResizeStatus = "Rejected"
+	ResizeNone      ResizeStatus = "None"
+)
+
+type ResizeRequest struct {
+	RequestStatus ResizeStatus           `json:"requestStatus,omitempty" protobuf:"bytes,1,opt,name=requestStatus"`
+	NewResources  []ResourceRequirements `json:"newResource,omitempty" protobuf:"bytes,2,rep,name=newResources"`
+	UpdatedCtrs   []bool                 `json:"updatedCtrs,omitempty" protobuf:"bytes,3,rep,name=updatedCtrs"`
+}
+
+type ResizeAction string
+
+const (
+	ResizeActionRestartOnly         ResizeAction = "RestartOnly"
+	ResizeActionLiveResize          ResizeAction = "LiveResize"
+	ResizeActionLiveResizePreferred ResizeAction = "LiveResizePreferred"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4148,6 +4201,15 @@ type Binding struct {
 
 	// The target object that you want to bind to the standard object.
 	Target ObjectReference `json:"target" protobuf:"bytes,2,opt,name=target"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Resizing resizes the resources allocated to a pod
+type Resizing struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Request           ResizeRequest `json:"request,omitempty" protobuf:"bytes,2,opt,name=request"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.

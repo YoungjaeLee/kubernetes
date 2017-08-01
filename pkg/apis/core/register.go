@@ -93,6 +93,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&Resizing{},
 	)
 
 	return nil

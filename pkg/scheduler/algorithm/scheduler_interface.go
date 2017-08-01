@@ -58,4 +58,6 @@ type ScheduleAlgorithm interface {
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Prioritizers() []PriorityConfig
+
+	Resize(pod *v1.Pod, nodeLister NodeLister) error
 }

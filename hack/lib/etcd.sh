@@ -18,7 +18,7 @@
 
 ETCD_VERSION=${ETCD_VERSION:-3.1.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-2379}
+ETCD_PORT=${ETCD_PORT:-62379}
 
 kube::etcd::validate() {
   # validate if in path

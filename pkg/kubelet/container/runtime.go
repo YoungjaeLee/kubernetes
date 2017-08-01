@@ -263,6 +263,7 @@ const (
 	ContainerStateExited  ContainerState = "exited"
 	// This unknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
+	ContainerStateResized ContainerState = "resized"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -284,6 +285,75 @@ type Container struct {
 	Hash uint64
 	// State is the state of the container.
 	State ContainerState
+}
+
+type LinuxContainerResources struct {
+	CpuPeriod          int64
+	CpuQuota           int64
+	CpuShares          int64
+	MemoryLimitInBytes int64
+	OomScoreAdj        int64
+}
+
+func (lc *LinuxContainerResources) ComputeResourceChanges(api_lc runtimeapi.LinuxContainerResources) (map[v1.ResourceName]bool, map[v1.ResourceName]bool) {
+	changed := make(map[v1.ResourceName]bool)
+	restartNeeded := make(map[v1.ResourceName]bool)
+
+	// docker update doesn't support to unset a cgroup value (by passing the default value(0) to docker) once the cgroup value was set when a container is created.
+	// So, to unset it, the container needs to be restarted.
+	if lc.CpuPeriod != api_lc.CpuPeriod {
+		changed[v1.ResourceCPU] = true
+		if api_lc.CpuPeriod == 0 {
+			restartNeeded[v1.ResourceCPU] = true
+		}
+	}
+	if lc.CpuQuota != api_lc.CpuQuota {
+		changed[v1.ResourceCPU] = true
+		if api_lc.CpuQuota == 0 {
+			restartNeeded[v1.ResourceCPU] = true
+		}
+	}
+	if lc.CpuShares != api_lc.CpuShares {
+		changed[v1.ResourceCPU] = true
+		if api_lc.CpuShares == 0 {
+			restartNeeded[v1.ResourceCPU] = true
+		}
+	}
+	if lc.MemoryLimitInBytes != api_lc.MemoryLimitInBytes {
+		changed[v1.ResourceMemory] = true
+		if api_lc.MemoryLimitInBytes == 0 {
+			restartNeeded[v1.ResourceMemory] = true
+		}
+	}
+	/* docker update doesn't support the update of OomScoreAdj
+	if lc.OomScoreAdj != api_lc.OomScoreAdj {
+		changed[v1.ResourceMemory] = true
+	}
+	*/
+
+	return changed, restartNeeded
+}
+
+func (lc *LinuxContainerResources) IsEqual(v *LinuxContainerResources) bool {
+	if lc.CpuPeriod != v.CpuPeriod {
+		return false
+	}
+	if lc.CpuQuota != v.CpuQuota {
+		return false
+	}
+	if lc.CpuShares != v.CpuShares {
+		return false
+	}
+	if lc.MemoryLimitInBytes != v.MemoryLimitInBytes {
+		return false
+	}
+	/* docker update doesn't support the update of OomScoreAdj
+	So, don't care about it.
+	if lc.OomScoreAdj != v.OomScoreAdj {
+		return false
+	}
+	*/
+	return true
 }
 
 // PodStatus represents the status of the pod and its containers.
@@ -327,13 +397,21 @@ type ContainerStatus struct {
 	ImageID string
 	// Hash of the container, used for comparison.
 	Hash uint64
+	// Hash of the container without its resources' value
+	HashNoResources uint64
 	// Number of times that the container has been restarted.
 	RestartCount int
 	// A string explains why container is in such a status.
 	Reason string
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
-	Message string
+	Message   string
+	Resources *LinuxContainerResources
+	// Whether the container has been resized or not.
+	RState ContainerState
+	// Resizing time of the container
+	// Actually, it is the time the PLEG detects the resizing by comparing cached Resources with the updated Resources
+	ResizedAt time.Time
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

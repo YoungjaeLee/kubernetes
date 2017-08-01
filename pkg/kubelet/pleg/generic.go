@@ -139,6 +139,10 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 
+func (g *GenericPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) error {
+	return g.updateCache(pod, pid)
+}
+
 func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
 	if newState == oldState {
 		return nil

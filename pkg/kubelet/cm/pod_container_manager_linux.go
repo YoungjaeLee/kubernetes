@@ -64,6 +64,20 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	return m.cgroupManager.Exists(podContainerName)
 }
 
+func (m *podContainerManagerImpl) Update(pod *v1.Pod) error {
+	podContainerName, _ := m.GetPodContainerName(pod)
+
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: ResourceConfigForPod(pod),
+	}
+	if err := m.cgroupManager.Update(containerConfig); err != nil {
+		return fmt.Errorf("failed to update container for %v : %v", podContainerName, err)
+	}
+
+	return nil
+}
+
 // EnsureExists takes a pod as argument and makes sure that
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
 // If the pod level container doesn't already exist it is created.
@@ -243,6 +257,10 @@ var _ PodContainerManager = &podContainerManagerNoop{}
 
 func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 	return true
+}
+
+func (m *podContainerManagerNoop) Update(_ *v1.Pod) error {
+	return nil
 }
 
 func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {

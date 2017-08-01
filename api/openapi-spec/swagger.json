@@ -5226,6 +5226,78 @@
      }
     ]
    },
+   "/api/v1/namespaces/{namespace}/pods/{name}/resizing": {
+    "post": {
+     "description": "create resizing of a Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1NamespacedPodResizing",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Resizing"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Resizing",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/namespaces/{namespace}/pods/{name}/status": {
     "get": {
      "description": "read status of the specified Pod",
@@ -6701,6 +6773,70 @@
       "in": "path",
       "required": true
      },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/resizings": {
+    "post": {
+     "description": "create a Resizing",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1NamespacedResizing",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Resizing"
+     }
+    },
+    "parameters": [
      {
       "uniqueItems": true,
       "type": "string",
@@ -75064,6 +75200,10 @@
    "io.k8s.api.core.v1.ContainerState": {
     "description": "ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.",
     "properties": {
+     "resized": {
+      "description": "Details about a resized container",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateResized"
+     },
      "running": {
       "description": "Details about a running container",
       "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateRunning"
@@ -75075,6 +75215,13 @@
      "waiting": {
       "description": "Details about a waiting container",
       "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateWaiting"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerStateResized": {
+    "properties": {
+     "resizedAt": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      }
     }
    },
@@ -77478,6 +77625,9 @@
       "description": "If specified, indicates the pod's priority. \"SYSTEM\" is a special keyword which indicates the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.",
       "type": "string"
      },
+     "resizeRequest": {
+      "$ref": "#/definitions/io.k8s.api.core.v1.ResizeRequest"
+     },
      "restartPolicy": {
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
       "type": "string"
@@ -78036,6 +78186,51 @@
      }
     }
    },
+   "io.k8s.api.core.v1.ResizeRequest": {
+    "properties": {
+     "newResource": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
+      }
+     },
+     "requestStatus": {
+      "type": "string"
+     },
+     "updatedCtrs": {
+      "type": "array",
+      "items": {
+       "type": "boolean"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.Resizing": {
+    "description": "Resizing resizes the resources allocated to a pod",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "request": {
+      "$ref": "#/definitions/io.k8s.api.core.v1.ResizeRequest"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Resizing"
+     }
+    ]
+   },
    "io.k8s.api.core.v1.ResourceFieldSelector": {
     "description": "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
     "required": [
@@ -78175,6 +78370,13 @@
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+      }
+     },
+     "resizePolicy": {
+      "description": "ResizePolicyList describes the policy for each resource on how to deal with a reqeust to resize the resource. it defaults to \"Disabled\"",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
       }
      }
     }

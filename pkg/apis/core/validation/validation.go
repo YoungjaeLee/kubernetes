@@ -3255,6 +3255,135 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 	}
 	return allErrs, false
 }
+func copyResources(dest, src *api.ResourceRequirements) {
+	if src.Limits != nil {
+		dest.Limits = make(api.ResourceList)
+	}
+	if src.Requests != nil {
+		dest.Requests = make(api.ResourceList)
+	}
+	dest.ResizePolicy = make(api.ResizePolicyList)
+
+	for resourceName, _ := range helper.GetStandardContainerResources() {
+		apiResourceName := api.ResourceName(resourceName)
+		if src.Limits != nil {
+			if v, exists := src.Limits[apiResourceName]; exists {
+				dest.Limits[apiResourceName] = v.DeepCopy()
+			}
+		}
+		if src.Requests != nil {
+			if v, exists := src.Requests[apiResourceName]; exists {
+				dest.Requests[apiResourceName] = v.DeepCopy()
+			}
+		}
+		if v, exists := src.ResizePolicy[apiResourceName]; exists {
+			dest.ResizePolicy[apiResourceName] = v
+		}
+	}
+}
+
+func isResourceReqChanged(old, new api.ResourceRequirements, resourceName api.ResourceName) bool {
+	if old.Limits != nil {
+		if new.Limits != nil {
+			if oldLimit, exists := old.Limits[resourceName]; exists {
+				if oldLimit.Cmp(new.Limits[resourceName]) != 0 {
+					return true
+				}
+			} else {
+				if _, exists := new.Limits[resourceName]; exists {
+					return true
+				}
+			}
+		}
+	} else {
+		if new.Limits != nil {
+			if _, exists := new.Limits[resourceName]; exists {
+				return true
+			}
+		}
+	}
+
+	if old.Requests != nil {
+		if new.Requests != nil {
+			if oldRequest, exists := old.Requests[resourceName]; exists {
+				if oldRequest.Cmp(new.Requests[resourceName]) != 0 {
+					return true
+				}
+			} else {
+				if _, exists := new.Requests[resourceName]; exists {
+					return true
+				}
+			}
+		}
+	} else {
+		if new.Requests != nil {
+			if _, exists := new.Requests[resourceName]; exists {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func ValidateContainerResourceUpdates(newContainers, oldContainers []api.Container, resizeRequest *api.ResizeRequest, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
+	invalid := false
+	updated := false
+	// updatedCtrs[ctr_idx] = bool
+	updatedCtrs := make(map[int]bool)
+
+	for i, oldCtr := range oldContainers {
+		for resourceName, _ := range helper.GetStandardContainerResources() {
+			apiResourceName := api.ResourceName(resourceName)
+			if isResourceReqChanged(oldCtr.Resources, newContainers[i].Resources, apiResourceName) {
+				if oldCtr.Resources.ResizePolicy[apiResourceName] == api.ResizeDisabled {
+					msg := fmt.Sprintf("The resizing of %s is disabled.", resourceName)
+					allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources"), msg))
+					invalid = true
+				} else {
+					updatedCtrs[i] = true
+					updated = true
+				}
+			}
+		}
+	}
+
+	if invalid {
+		return allErrs, true
+	}
+
+	if !updated {
+		// There is no changes in newContainers[*].resources.
+		// So, if there is a resizeRequest that has been requested before, it should be voided here.
+		// For example, this is the case where a user applies the same newContainers[*].resources to cancel a presiously resizeRequest.
+		// Now, if for some reasons a resizeRequest is rejected, the scheduler just keeps trying to do that until it succeeds.
+		// So, it's kind of the only way to stop this retrying operation, other than killing the pod.
+		if resizeRequest.RequestStatus == api.ResizeRequested {
+			*resizeRequest = api.ResizeRequest{}
+		}
+
+		return allErrs, false
+	}
+	// There are valid resource updates.
+	// Build a resizeRequest.
+	resizeRequest.RequestStatus = api.ResizeRequested
+	resizeRequest.NewResources = make([]api.ResourceRequirements, len(newContainers))
+	resizeRequest.UpdatedCtrs = make([]bool, len(newContainers))
+
+	for i, v := range updatedCtrs {
+		if v {
+			copyResources(&resizeRequest.NewResources[i], &newContainers[i].Resources)
+			resizeRequest.UpdatedCtrs[i] = true
+
+			// Get the Resources.Limits/Requests of newContainers back to the original (of oldContainers).
+			// Need to do that in order to preserve the original Resources.
+			// Since we don't know whether the resouce updates will be accepted or not at this moment.
+			copyResources(&newContainers[i].Resources, &oldContainers[i].Resources)
+		}
+	}
+
+	return allErrs, false
+}
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
@@ -3268,6 +3397,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	// 1.  spec.containers[*].image
 	// 2.  spec.initContainers[*].image
 	// 3.  spec.activeDeadlineSeconds
+	// 4.  sepc.containers[*].Resources
 
 	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
 	allErrs = append(allErrs, containerErrs...)
@@ -3300,6 +3430,16 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newPod.Spec.ActiveDeadlineSeconds, "must not update from a positive integer to nil value"))
 	}
 
+	// validate updated spec.containers[*].Resources
+	containerErrs, stop = ValidateContainerResourceUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, &newPod.Spec.ResizeRequest, specPath.Child("containers"))
+	allErrs = append(allErrs, containerErrs...)
+	if stop {
+		return allErrs
+	}
+
+	glog.Infof("newPod: %v", newPod)
+	glog.Infof("oldPod: %v", oldPod)
+
 	// handle updateable fields by munging those fields prior to deep equal comparison.
 	mungedPod := *newPod
 	// munge spec.containers[*].image
@@ -3326,6 +3466,9 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	// Allow only additions to tolerations updates.
 	mungedPod.Spec.Tolerations = oldPod.Spec.Tolerations
 	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
+
+	// munge spec.resizeRequest
+	mungedPod.Spec.ResizeRequest = oldPod.Spec.ResizeRequest
 
 	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
@@ -3381,6 +3524,19 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 
 	// For status update we ignore changes to pod spec.
 	newPod.Spec = oldPod.Spec
+
+	return allErrs
+}
+func ValidatePodResizing(resizing *api.Resizing) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(resizing.Request.RequestStatus) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("RequestStatus"), "empty result"))
+	}
+
+	if resizing.Request.RequestStatus != api.ResizeAccepted {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("RequestStatus"), resizing.Request.RequestStatus, fmt.Sprintf("invalid value for RequestStatus.")))
+	}
 
 	return allErrs
 }

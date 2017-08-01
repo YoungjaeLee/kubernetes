@@ -111,6 +111,7 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -153,6 +154,7 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -177,6 +179,12 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -255,6 +263,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -297,6 +306,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -321,6 +331,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -421,6 +437,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -463,6 +480,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -487,6 +505,12 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 

@@ -162,6 +162,10 @@ func IsDefaultNamespaceResource(name core.ResourceName) bool {
 
 var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
 
+func GetStandardContainerResources() sets.String {
+	return standardContainerResources
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and not blacklisted.
 func IsOvercommitAllowed(name core.ResourceName) bool {
@@ -582,4 +586,8 @@ func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinit
 	}
 	annotations[core.AlphaStorageNodeAffinityAnnotation] = string(json)
 	return nil
+}
+
+func GetResizeActionFromPodAnnotations(annotations map[string]string) api.ResizeAction {
+	return api.ResizeAction(annotations[api.ResizeActionKey])
 }

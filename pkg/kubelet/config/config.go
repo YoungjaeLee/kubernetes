@@ -440,6 +440,26 @@ func podsDifferSemantically(existing, ref *v1.Pod) bool {
 //   Now, needUpdate, needGracefulDelete and needReconcile should never be both true
 func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGracefulDelete bool) {
 
+	// 0. Check if the pod is being under resource resizing
+	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
+		if ref.DeletionTimestamp == nil {
+			return
+		}
+	}
+	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
+		if ref.DeletionTimestamp == nil {
+			return
+		}
+	}
+	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
+		if ref.DeletionTimestamp == nil {
+			return
+		}
+	}
+
 	// 1. this is a reconcile
 	// TODO: it would be better to update the whole object and only preserve certain things
 	//       like the source annotation or the UID (to ensure safety)

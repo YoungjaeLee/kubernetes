@@ -18,6 +18,7 @@ package pleg
 
 import (
 	"k8s.io/apimachinery/pkg/types"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type PodLifeCycleEventType string
@@ -49,4 +50,7 @@ type PodLifecycleEventGenerator interface {
 	Start()
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
+
+	// used in SyncPod after updateContainer to update the PodState of the updated Pod.
+	UpdateCache(*kubecontainer.Pod, types.UID) error
 }

@@ -23,9 +23,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-SILENT=true
-ALL=false
-V=""
+#SILENT=true
+#ALL=false
+#V=""
+SILENT=false
+ALL=true
+V="-v"
 
 while getopts ":va" opt; do
 	case $opt in

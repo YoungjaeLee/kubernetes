@@ -113,6 +113,14 @@ func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
 	return err
 }
 
+func (in instrumentedRuntimeService) UpdateContainer(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	const operation = "update_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.UpdateContainer(containerID, resources)
+	recordError(operation, err)
+	return err
+}
 func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())

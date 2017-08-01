@@ -39,6 +39,8 @@ type ContainerManager interface {
 	StopContainer(containerID string, timeout int64) error
 	// RemoveContainer removes the container.
 	RemoveContainer(containerID string) error
+	// UpdateContainer updates the container
+	UpdateContainer(containerID string, resources *runtimeapi.LinuxContainerResources) error
 	// ListContainers lists all containers by filters.
 	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 	// ContainerStatus returns the status of the container.

@@ -46,6 +46,11 @@ type Binder interface {
 	Bind(binding *v1.Binding) error
 }
 
+// Resizer knows how to write a resizing
+type Resizer interface {
+	Resize(resizing *v1.Resizing) (*v1.Pod, error)
+}
+
 // PodConditionUpdater updates the condition of a pod based on the passed
 // PodCondition
 type PodConditionUpdater interface {
@@ -108,6 +113,7 @@ type Config struct {
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
 	Binder     Binder
+	Resizer    Resizer
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -182,6 +188,74 @@ func (sched *Scheduler) Run() {
 // Config return scheduler's config pointer. It is exposed for testing purposes.
 func (sched *Scheduler) Config() *Config {
 	return sched.config
+}
+
+// resize implements the resizing algorithm and returns the feasibility.
+func (sched *Scheduler) resize(pod *v1.Pod) error {
+	err := sched.config.Algorithm.Resize(pod, sched.config.NodeLister)
+	if err == nil {
+		pod.Spec.ResizeRequest.RequestStatus = v1.ResizeAccepted
+	} else {
+		glog.V(1).Infof("Failed to resize pod: %v/%v", pod.Namespace, pod.Name)
+		copied, cerr := api.Scheme.Copy(pod)
+		if cerr != nil {
+			runtime.HandleError(err)
+			return err
+		}
+		pod = copied.(*v1.Pod)
+		sched.config.Error(pod, err)
+		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedResizing", "%v", err)
+		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:    v1.PodResized,
+			Status:  v1.ConditionRejected,
+			Reason:  v1.PodReasonUnresizable,
+			Message: err.Error(),
+		})
+	}
+	return err
+}
+
+func getResizedPod(pod *v1.Pod) *v1.Pod {
+	resizedPod := *pod
+
+	resizedPod.Spec.Containers = make([]v1.Container, len(pod.Spec.Containers))
+	for idx, container := range pod.Spec.Containers {
+		resizedPod.Spec.Containers[idx] = container
+		if pod.Spec.ResizeRequest.UpdatedCtrs[idx] {
+			resizedPod.Spec.Containers[idx].Resources = pod.Spec.ResizeRequest.NewResources[idx]
+		}
+	}
+	return &resizedPod
+}
+
+func (sched *Scheduler) assumeResizedPod(pod *v1.Pod) (*v1.Pod, error) {
+	resizedPod := getResizedPod(pod)
+	err := sched.config.SchedulerCache.AssumeResizedPod(pod, resizedPod)
+	if err != nil {
+		glog.Errorf("scheduler cache AssumeResizedPod for resizing failed: %v", err)
+		// TODO: Something must have gone critically wrong if this cache operation fails.
+	}
+	return resizedPod, err
+}
+
+func (sched *Scheduler) do_resize(pod, resizedPod *v1.Pod, r *v1.Resizing) error {
+	_, err := sched.config.Resizer.Resize(r)
+	if err != nil {
+		glog.V(1).Infof("Update resizing result failed: %v", err)
+		sched.config.Error(pod, err)
+		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedResizing", "%v", err)
+		if err1 := sched.config.SchedulerCache.ForgetResizedPod(pod, resizedPod); err1 != nil {
+			glog.Errorf("scheduler cache ForgetResizedPod failed: %v", err1)
+		}
+		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:    v1.PodResized,
+			Status:  v1.ConditionRejected,
+			Reason:  v1.PodReasonResizerFailed,
+			Message: err.Error(),
+		})
+	}
+
+	return err
 }
 
 // schedule implements the scheduling algorithm and returns the suggested host.
@@ -432,6 +506,30 @@ func (sched *Scheduler) scheduleOne() {
 	if pod.DeletionTimestamp != nil {
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		return
+	}
+
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+		glog.V(3).Infof("Attempting to resize pod: %v/%v", pod.Namespace, pod.Name)
+		err := sched.resize(pod)
+		if err != nil {
+			return
+		}
+
+		resizedPod, err := sched.assumeResizedPod(pod)
+		if err != nil {
+			return
+		}
+
+		go func() {
+			err := sched.do_resize(pod, resizedPod, &v1.Resizing{
+				ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+				Request:    pod.Spec.ResizeRequest,
+			})
+			if err != nil {
+				glog.Errorf("Internal error resizing pod: (%v)", err)
+			}
+		}()
 		return
 	}
 

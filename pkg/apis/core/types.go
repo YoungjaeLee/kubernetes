@@ -1938,6 +1938,9 @@ type ResourceRequirements struct {
 	// otherwise to an implementation-defined value
 	// +optional
 	Requests ResourceList
+	// ResizePlicy describes the policy for each resource on how to deal with a request to resize the resource.
+	// it defaults to "Disabled"
+	ResizePolicy ResizePolicyList
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -2052,9 +2055,13 @@ type ConditionStatus string
 // can't decide if a resource is in the condition or not. In the future, we could add other
 // intermediate conditions, e.g. ConditionDegraded.
 const (
-	ConditionTrue    ConditionStatus = "True"
-	ConditionFalse   ConditionStatus = "False"
-	ConditionUnknown ConditionStatus = "Unknown"
+	ConditionTrue      ConditionStatus = "True"
+	ConditionFalse     ConditionStatus = "False"
+	ConditionUnknown   ConditionStatus = "Unknown"
+	ConditionRequested ConditionStatus = "Requested"
+	ConditionAccepted  ConditionStatus = "Accepted"
+	ConditionRejected  ConditionStatus = "Rejected"
+	ConditionDone      ConditionStatus = "Done"
 )
 
 type ContainerStateWaiting struct {
@@ -2087,6 +2094,10 @@ type ContainerStateTerminated struct {
 	ContainerID string
 }
 
+type ContainerStateResized struct {
+	ResizedAt metav1.Time
+}
+
 // ContainerState holds a possible state of container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
@@ -2097,6 +2108,8 @@ type ContainerState struct {
 	Running *ContainerStateRunning
 	// +optional
 	Terminated *ContainerStateTerminated
+	// +optional
+	Resized *ContainerStateResized
 }
 
 type ContainerStatus struct {
@@ -2151,9 +2164,13 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
+	// PodResized represents the status of the resizing process for this pod
+	PodResized PodConditionType = "PodResized"
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	PodReasonUnresizable   = "Unresizable"
+	PodReasonResizerFailed = "ResizerFailed"
 )
 
 type PodCondition struct {
@@ -2586,7 +2603,8 @@ type PodSpec struct {
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
 	// +optional
-	DNSConfig *PodDNSConfig
+	DNSConfig     *PodDNSConfig
+	ResizeRequest ResizeRequest
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -3588,6 +3606,41 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
+// ResizePolicy is the name identifying various policies in ResizePolicyList.
+type ResizePolicyName string
+
+const (
+	ResizeDisabled       ResizePolicyName = "Disabled"
+	ResizeRestartOnly    ResizePolicyName = "RestartOnly"
+	ResizeLiveResizeable ResizePolicyName = "LiveResizeable"
+)
+
+// ResizePolicyList is a set of (resource name, resize policy) pairs.
+type ResizePolicyList map[ResourceName]ResizePolicyName
+
+type ResizeStatus string
+
+const (
+	ResizeRequested ResizeStatus = "Requested"
+	ResizeAccepted  ResizeStatus = "Accepted"
+	ResizeRejected  ResizeStatus = "Rejected"
+	ResizeNone      ResizeStatus = "None"
+)
+
+type ResizeRequest struct {
+	RequestStatus ResizeStatus
+	NewResources  []ResourceRequirements
+	UpdatedCtrs   []bool
+}
+
+type ResizeAction string
+
+const (
+	ResizeActionRestartOnly         ResizeAction = "RestartOnly"
+	ResizeActionLiveResize          ResizeAction = "LiveResize"
+	ResizeActionLiveResizePreferred ResizeAction = "LiveResizePreferred"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3680,6 +3733,15 @@ type NamespaceList struct {
 	metav1.ListMeta
 
 	Items []Namespace
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Resizing resizes the resources allocated to a pod
+type Resizing struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+	Request ResizeRequest
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

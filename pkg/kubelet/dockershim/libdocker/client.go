@@ -55,6 +55,7 @@ type Interface interface {
 	StopContainer(id string, timeout time.Duration) error
 	UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error
 	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
+	UpdateContainer(id string, updateConfig dockercontainer.UpdateConfig) error
 	InspectImageByRef(imageRef string) (*dockertypes.ImageInspect, error)
 	InspectImageByID(imageID string) (*dockertypes.ImageInspect, error)
 	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error)

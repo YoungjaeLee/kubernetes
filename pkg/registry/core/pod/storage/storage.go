@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +48,7 @@ type PodStorage struct {
 	Pod         *REST
 	Binding     *BindingREST
 	Eviction    *EvictionREST
+	Resizing    *ResizingREST
 	Status      *StatusREST
 	Log         *podrest.LogREST
 	Proxy       *podrest.ProxyREST
@@ -88,6 +90,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	return PodStorage{
 		Pod:         &REST{store, proxyTransport},
 		Binding:     &BindingREST{store: store},
+		Resizing:    &ResizingREST{store: store},
 		Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
 		Status:      &StatusREST{store: &statusStore},
 		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
@@ -120,6 +123,78 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"all"}
+}
+
+// ResizingREST implements the REST endpoint for resizing pods.
+type ResizingREST struct {
+	store *genericregistry.Store
+}
+
+func (r *ResizingREST) New() runtime.Object {
+	return &api.Resizing{}
+}
+
+var _ = rest.Creater(&ResizingREST{})
+
+func (r *ResizingREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (out runtime.Object, err error) {
+	resizing := obj.(*api.Resizing)
+
+	if errs := validation.ValidatePodResizing(resizing); len(errs) != 0 {
+		return nil, errs.ToAggregate()
+	}
+
+	out, err = r.resizePod(ctx, resizing.Name, resizing.Request)
+
+	return out, err
+}
+
+func (r *ResizingREST) resizePod(ctx genericapirequest.Context, podID string, request api.ResizeRequest) (pod *api.Pod, err error) {
+	pod, err = r.setPodResizingResult(ctx, podID, request)
+
+	return pod, err
+}
+
+func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID string, request api.ResizeRequest) (finalPod *api.Pod, err error) {
+	podKey, err := r.store.KeyFunc(ctx, podID)
+	if err != nil {
+		return nil, err
+	}
+	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+		pod, ok := obj.(*api.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object: %v", obj)
+		}
+		if pod.DeletionTimestamp != nil {
+			return nil, fmt.Errorf("pod %s is being deleted, cannot be resized.", pod.Name)
+		}
+		if pod.Spec.ResizeRequest.RequestStatus != api.ResizeRequested {
+			return nil, fmt.Errorf("pod %s is not being requested to be resized (%v).", pod.Name, pod.Spec.ResizeRequest.RequestStatus)
+		}
+
+		if request.RequestStatus == api.ResizeAccepted {
+			if reflect.DeepEqual(pod.Spec.ResizeRequest.NewResources, request.NewResources) {
+				podutil.UpdatePodCondition(&pod.Status, &api.PodCondition{
+					Type:   api.PodResized,
+					Status: api.ConditionAccepted,
+				})
+				pod.Spec.ResizeRequest.RequestStatus = api.ResizeNone
+				for idx, resources := range request.NewResources {
+					if !request.UpdatedCtrs[idx] {
+						continue
+					}
+					pod.Spec.Containers[idx].Resources = resources
+				}
+				pod.Spec.ResizeRequest = api.ResizeRequest{}
+			} else {
+				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
+			}
+		} else {
+			return nil, fmt.Errorf("The RequestStatus is not %v. Something has been critically wrong.", api.ResizeAccepted)
+		}
+		finalPod = pod
+		return pod, nil
+	}))
+	return finalPod, err
 }
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.

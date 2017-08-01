@@ -89,6 +89,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&Resizing{},
 	)
 
 	// Add common types

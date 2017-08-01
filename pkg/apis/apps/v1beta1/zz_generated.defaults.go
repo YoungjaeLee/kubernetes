@@ -105,6 +105,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -147,6 +148,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -171,6 +173,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 		}
+	}
+	for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
 	}
 }
 
@@ -249,6 +257,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -291,6 +300,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 		}
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Resources.ResizePolicy)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -316,11 +326,18 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			}
 		}
 	}
+	for i := range in.Spec.Template.Spec.ResizeRequest.NewResources {
+		a := &in.Spec.Template.Spec.ResizeRequest.NewResources[i]
+		v1.SetDefaults_ResourceList(&a.Limits)
+		v1.SetDefaults_ResourceList(&a.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.ResizePolicy)
+	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		v1.SetDefaults_PersistentVolumeClaim(a)
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+		v1.SetDefaults_ResizePolicyList(&a.Spec.Resources.ResizePolicy)
 		v1.SetDefaults_ResourceList(&a.Status.Capacity)
 	}
 }

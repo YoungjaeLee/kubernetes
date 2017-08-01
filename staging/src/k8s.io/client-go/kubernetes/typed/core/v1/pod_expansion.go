@@ -28,11 +28,24 @@ type PodExpansion interface {
 	Bind(binding *v1.Binding) error
 	Evict(eviction *policy.Eviction) error
 	GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request
+	Resize(resizing *v1.Resizing) (*v1.Pod, error)
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
 func (c *pods) Bind(binding *v1.Binding) error {
 	return c.client.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
+}
+
+func (c *pods) Resize(resizing *v1.Resizing) (*v1.Pod, error) {
+	result := c.client.Post().Namespace(c.ns).Resource("pods").Name(resizing.Name).SubResource("resizing").Body(resizing).Do()
+
+	pod := &v1.Pod{}
+	err := result.Error()
+	if err == nil {
+		result.Into(pod)
+	}
+
+	return pod, err
 }
 
 func (c *pods) Evict(eviction *policy.Eviction) error {

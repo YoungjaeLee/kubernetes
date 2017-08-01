@@ -163,7 +163,9 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.restartPolicy",
 				"spec.schedulerName",
 				"status.phase",
-				"status.podIP":
+				"status.hostIP",
+				"status.podIP",
+				"spec.resizeRequest.requestStatus":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":

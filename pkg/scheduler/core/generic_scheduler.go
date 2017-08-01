@@ -105,6 +105,55 @@ type genericScheduler struct {
 	pvcLister         corelisters.PersistentVolumeClaimLister
 }
 
+// Resize sees whether the resized pod fits to the node that the pod is currently running on.
+func (g *genericScheduler) Resize(pod *v1.Pod, nodeLister algorithm.NodeLister) error {
+	trace := utiltrace.New(fmt.Sprintf("Resizing %s/%s", pod.Namespace, pod.Name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
+	node, err := nodeLister.Get(pod.Spec.NodeName)
+	if err != nil {
+		return err
+	}
+	// leverage the exsiting procedure (findNodesThatFit) to see the node fits, or not.
+	nodes := make([]*v1.Node, 1)
+	nodes[0] = node
+
+	nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
+	err = g.cache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod)
+	if err != nil {
+		return nil
+	}
+
+	oldResources := make(map[int]v1.ResourceRequirements)
+	for ctr_idx, newResource := range pod.Spec.ResizeRequest.NewResources {
+		if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+			continue
+		}
+		oldResources[ctr_idx] = pod.Spec.Containers[ctr_idx].Resources
+		pod.Spec.Containers[ctr_idx].Resources = newResource
+	}
+
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache)
+	for ctr_idx, _ := range pod.Spec.ResizeRequest.NewResources {
+		if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+			continue
+		}
+		pod.Spec.Containers[ctr_idx].Resources = oldResources[ctr_idx]
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(filteredNodes) == 0 {
+		return &FitError{
+			Pod:              pod,
+			FailedPredicates: failedPredicateMap,
+		}
+	}
+
+	return nil
+}
+
 // Schedule tries to schedule the given pod to one of node in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.

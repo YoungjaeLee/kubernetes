@@ -118,4 +118,8 @@ type Cache interface {
 
 	// FilteredList returns all cached pods that pass the filter.
 	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+
+	AssumeResizedPod(oldPod, newPod *v1.Pod) error
+	ForgetResizedPod(oldPod, newPod *v1.Pod) error
+	GetNodeNameToInfoMapforResizing(nodeNameToInfo map[string]*NodeInfo, pod *v1.Pod) error
 }

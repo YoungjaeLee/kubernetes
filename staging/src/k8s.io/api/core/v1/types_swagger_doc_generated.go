@@ -334,6 +334,7 @@ var map_ContainerState = map[string]string{
 	"waiting":    "Details about a waiting container",
 	"running":    "Details about a running container",
 	"terminated": "Details about a terminated container",
+	"resized":    "Details about a resized container",
 }
 
 func (ContainerState) SwaggerDoc() map[string]string {
@@ -1759,6 +1760,14 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
 }
 
+var map_Resizing = map[string]string{
+	"": "Resizing resizes the resources allocated to a pod",
+}
+
+func (Resizing) SwaggerDoc() map[string]string {
+	return map_Resizing
+}
+
 var map_ResourceFieldSelector = map[string]string{
 	"":              "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
 	"containerName": "Container name: required for volumes, optional for env vars",
@@ -1812,9 +1821,10 @@ func (ResourceQuotaStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceRequirements = map[string]string{
-	"":         "ResourceRequirements describes the compute resource requirements.",
-	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
-	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"":             "ResourceRequirements describes the compute resource requirements.",
+	"limits":       "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"requests":     "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"resizePolicy": "ResizePolicyList describes the policy for each resource on how to deal with a reqeust to resize the resource. it defaults to \"Disabled\"",
 }
 
 func (ResourceRequirements) SwaggerDoc() map[string]string {

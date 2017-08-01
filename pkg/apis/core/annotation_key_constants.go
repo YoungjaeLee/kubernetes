@@ -89,4 +89,8 @@ const (
 	//
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
+
+	// ResizeActionKey represents the policy of resource resizing, which is applied when
+	// a policy is not specified at the container-level.
+	ResizeActionKey string = "resizeAction"
 )
