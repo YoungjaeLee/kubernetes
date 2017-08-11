@@ -443,21 +443,12 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 	// 0. Check if the pod is being under resource resizing
 	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
 		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
-		if ref.DeletionTimestamp == nil {
-			return
-		}
 	}
 	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
 		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
-		if ref.DeletionTimestamp == nil {
-			return
-		}
 	}
 	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
-		if ref.DeletionTimestamp == nil {
-			return
-		}
 	}
 
 	// 1. this is a reconcile
@@ -475,6 +466,9 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 		}
 		return
 	}
+	// Kubelet shouldn't care about the changes on ResizeRequest
+	// But, the PodStatus needs to be updated.
+	//ref.Spec.ResizeRequest = existing.Spec.ResizeRequest
 
 	// Overwrite the first-seen time with the existing one. This is our own
 	// internal annotation, there is no need to update.

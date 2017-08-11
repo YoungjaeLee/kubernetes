@@ -196,6 +196,7 @@ func (sched *Scheduler) resize(pod *v1.Pod) error {
 	if err == nil {
 		pod.Spec.ResizeRequest.RequestStatus = v1.ResizeAccepted
 	} else {
+		pod.Spec.ResizeRequest.RequestStatus = v1.ResizeRejected
 		glog.V(1).Infof("Failed to resize pod: %v/%v", pod.Namespace, pod.Name)
 		copied, cerr := api.Scheme.Copy(pod)
 		if cerr != nil {
@@ -221,9 +222,12 @@ func getResizedPod(pod *v1.Pod) *v1.Pod {
 	resizedPod.Spec.Containers = make([]v1.Container, len(pod.Spec.Containers))
 	for idx, container := range pod.Spec.Containers {
 		resizedPod.Spec.Containers[idx] = container
-		if pod.Spec.ResizeRequest.UpdatedCtrs[idx] {
-			resizedPod.Spec.Containers[idx].Resources = pod.Spec.ResizeRequest.NewResources[idx]
-		}
+		resizedPod.Spec.Containers[idx].Resources = pod.Spec.ResizeRequest.NewResources[idx]
+		/*
+			if pod.Spec.ResizeRequest.UpdatedCtrs[idx] {
+				resizedPod.Spec.Containers[idx].Resources = pod.Spec.ResizeRequest.NewResources[idx]
+			}
+		*/
 	}
 	return &resizedPod
 }

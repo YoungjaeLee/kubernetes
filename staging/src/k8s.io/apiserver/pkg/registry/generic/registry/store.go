@@ -946,6 +946,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
+
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
 		options = metav1.NewDeleteOptions(0)
@@ -968,6 +969,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	if err != nil {
 		return nil, false, kubeerr.NewInternalError(err)
 	}
+
 	pendingFinalizers := len(accessor.GetFinalizers()) != 0
 	var ignoreNotFound bool
 	var deleteImmediately bool = true

@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -3255,17 +3256,17 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 	}
 	return allErrs, false
 }
-func copyResources(dest, src *api.ResourceRequirements) {
+func copyResources(dest, src *core.ResourceRequirements) {
 	if src.Limits != nil {
-		dest.Limits = make(api.ResourceList)
+		dest.Limits = make(core.ResourceList)
 	}
 	if src.Requests != nil {
-		dest.Requests = make(api.ResourceList)
+		dest.Requests = make(core.ResourceList)
 	}
-	dest.ResizePolicy = make(api.ResizePolicyList)
+	dest.ResizePolicy = make(core.ResizePolicyList)
 
 	for resourceName, _ := range helper.GetStandardContainerResources() {
-		apiResourceName := api.ResourceName(resourceName)
+		apiResourceName := core.ResourceName(resourceName)
 		if src.Limits != nil {
 			if v, exists := src.Limits[apiResourceName]; exists {
 				dest.Limits[apiResourceName] = v.DeepCopy()
@@ -3282,7 +3283,7 @@ func copyResources(dest, src *api.ResourceRequirements) {
 	}
 }
 
-func isResourceReqChanged(old, new api.ResourceRequirements, resourceName api.ResourceName) bool {
+func isResourceReqChanged(old, new core.ResourceRequirements, resourceName core.ResourceName) bool {
 	if old.Limits != nil {
 		if new.Limits != nil {
 			if oldLimit, exists := old.Limits[resourceName]; exists {
@@ -3326,22 +3327,22 @@ func isResourceReqChanged(old, new api.ResourceRequirements, resourceName api.Re
 	return false
 }
 
-func ValidateContainerResourceUpdates(newContainers, oldContainers []api.Container, resizeRequest *api.ResizeRequest, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
+func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Container, resizeRequest *core.ResizeRequest, status *core.PodStatus, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
 	invalid := false
 	updated := false
 	// updatedCtrs[ctr_idx] = bool
-	updatedCtrs := make(map[int]bool)
+	// updatedCtrs := make(map[int]bool)
 
 	for i, oldCtr := range oldContainers {
 		for resourceName, _ := range helper.GetStandardContainerResources() {
-			apiResourceName := api.ResourceName(resourceName)
+			apiResourceName := core.ResourceName(resourceName)
 			if isResourceReqChanged(oldCtr.Resources, newContainers[i].Resources, apiResourceName) {
-				if oldCtr.Resources.ResizePolicy[apiResourceName] == api.ResizeDisabled {
+				if oldCtr.Resources.ResizePolicy[apiResourceName] == core.ResizeDisabled {
 					msg := fmt.Sprintf("The resizing of %s is disabled.", resourceName)
 					allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources"), msg))
 					invalid = true
 				} else {
-					updatedCtrs[i] = true
+					//updatedCtrs[i] = true
 					updated = true
 				}
 			}
@@ -3358,29 +3359,54 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []api.Contain
 		// For example, this is the case where a user applies the same newContainers[*].resources to cancel a presiously resizeRequest.
 		// Now, if for some reasons a resizeRequest is rejected, the scheduler just keeps trying to do that until it succeeds.
 		// So, it's kind of the only way to stop this retrying operation, other than killing the pod.
-		if resizeRequest.RequestStatus == api.ResizeRequested {
-			*resizeRequest = api.ResizeRequest{}
+		if resizeRequest.RequestStatus == core.ResizeRequested {
+			glog.Infof("Getting back to the original resource requirement")
+			*resizeRequest = core.ResizeRequest{}
+
+			podutil.UpdatePodCondition(status, &core.PodCondition{
+				Type:   core.PodResized,
+				Status: core.ConditionFalse,
+			})
+
 		}
 
 		return allErrs, false
 	}
 	// There are valid resource updates.
 	// Build a resizeRequest.
-	resizeRequest.RequestStatus = api.ResizeRequested
-	resizeRequest.NewResources = make([]api.ResourceRequirements, len(newContainers))
+	resizeRequest.RequestStatus = core.ResizeRequested
+	resizeRequest.NewResources = make([]core.ResourceRequirements, len(newContainers))
 	resizeRequest.UpdatedCtrs = make([]bool, len(newContainers))
 
-	for i, v := range updatedCtrs {
-		if v {
-			copyResources(&resizeRequest.NewResources[i], &newContainers[i].Resources)
-			resizeRequest.UpdatedCtrs[i] = true
-
-			// Get the Resources.Limits/Requests of newContainers back to the original (of oldContainers).
-			// Need to do that in order to preserve the original Resources.
-			// Since we don't know whether the resouce updates will be accepted or not at this moment.
-			copyResources(&newContainers[i].Resources, &oldContainers[i].Resources)
-		}
+	for i, _ := range oldContainers {
+		copyResources(&resizeRequest.NewResources[i], &newContainers[i].Resources)
+		// Get the Resources.Limits/Requests of newContainers back to the original (of oldContainers).
+		// Need to do that in order to preserve the original Resources.
+		// Since we don't know whether the resouce updates will be accepted or not at this moment.
+		newContainers[i].Resources = core.ResourceRequirements{}
+		copyResources(&newContainers[i].Resources, &oldContainers[i].Resources)
 	}
+
+	podutil.UpdatePodCondition(status, &core.PodCondition{
+		Type:   core.PodResized,
+		Status: core.ConditionRequested,
+	})
+
+	/*
+		for i, v := range updatedCtrs {
+			if v {
+				copyResources(&resizeRequest.NewResources[i], &newContainers[i].Resources)
+				resizeRequest.UpdatedCtrs[i] = true
+
+				// Get the Resources.Limits/Requests of newContainers back to the original (of oldContainers).
+				// Need to do that in order to preserve the original Resources.
+				// Since we don't know whether the resouce updates will be accepted or not at this moment.
+				copyResources(&newContainers[i].Resources, &oldContainers[i].Resources)
+			} else {
+				copyResources(&resizeRequest.NewResources[i], &oldContainers[i].Resources)
+			}
+		}
+	*/
 
 	return allErrs, false
 }
@@ -3431,7 +3457,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	}
 
 	// validate updated spec.containers[*].Resources
-	containerErrs, stop = ValidateContainerResourceUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, &newPod.Spec.ResizeRequest, specPath.Child("containers"))
+	containerErrs, stop = ValidateContainerResourceUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, &newPod.Spec.ResizeRequest, &newPod.Status, specPath.Child("containers"))
 	allErrs = append(allErrs, containerErrs...)
 	if stop {
 		return allErrs
@@ -3527,14 +3553,14 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 
 	return allErrs
 }
-func ValidatePodResizing(resizing *api.Resizing) field.ErrorList {
+func ValidatePodResizing(resizing *core.Resizing) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(resizing.Request.RequestStatus) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("RequestStatus"), "empty result"))
 	}
 
-	if resizing.Request.RequestStatus != api.ResizeAccepted {
+	if resizing.Request.RequestStatus != core.ResizeAccepted {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("RequestStatus"), resizing.Request.RequestStatus, fmt.Sprintf("invalid value for RequestStatus.")))
 	}
 

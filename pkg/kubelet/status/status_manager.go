@@ -436,6 +436,7 @@ func (m *manager) syncBatch() {
 
 	for _, update := range updatedStatuses {
 		glog.V(5).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
+
 		m.syncPod(update.podUID, update.status)
 	}
 }

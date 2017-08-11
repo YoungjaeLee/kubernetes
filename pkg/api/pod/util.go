@@ -167,6 +167,30 @@ func visitContainerConfigmapNames(container *api.Container, visitor Visitor) boo
 	return true
 }
 
+func IsPodBeingResized(pod *api.Pod) bool {
+	return !(IsPodResizedConditionDone(pod.Status) || IsPodResizedConditionFalse(pod.Status) || IsPodResizedConditionNA(pod.Status))
+}
+
+func IsPodResizedConditionDone(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == api.ConditionDone
+}
+
+func IsPodResizedConditionFalse(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == api.ConditionFalse
+}
+
+func IsPodResizedConditionNA(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition == nil
+}
+
+func GetPodResizedCondition(status api.PodStatus) *api.PodCondition {
+	_, condition := GetPodCondition(&status, api.PodResized)
+	return condition
+}
+
 // IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *api.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)

@@ -126,18 +126,22 @@ func (g *genericScheduler) Resize(pod *v1.Pod, nodeLister algorithm.NodeLister) 
 
 	oldResources := make(map[int]v1.ResourceRequirements)
 	for ctr_idx, newResource := range pod.Spec.ResizeRequest.NewResources {
-		if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
-			continue
-		}
+		/*
+			if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+				continue
+			}
+		*/
 		oldResources[ctr_idx] = pod.Spec.Containers[ctr_idx].Resources
 		pod.Spec.Containers[ctr_idx].Resources = newResource
 	}
 
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache)
 	for ctr_idx, _ := range pod.Spec.ResizeRequest.NewResources {
-		if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
-			continue
-		}
+		/*
+			if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+				continue
+			}
+		*/
 		pod.Spec.Containers[ctr_idx].Resources = oldResources[ctr_idx]
 	}
 	if err != nil {
