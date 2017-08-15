@@ -58,6 +58,7 @@ type RuntimeHelper interface {
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 	UpdatePodStatusCache(pod *v1.Pod) error
+	UpdatePodCgroup(pod *v1.Pod) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

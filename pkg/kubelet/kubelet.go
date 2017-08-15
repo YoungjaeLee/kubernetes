@@ -1197,6 +1197,10 @@ func allLocalIPsWithoutLoopback() ([]net.IP, error) {
 	return ips, nil
 }
 
+func (kl *Kubelet) UpdatePodCgroup(pod *v1.Pod) error {
+	return kl.containerManager.NewPodContainerManager().Update(pod)
+}
+
 func (kl *Kubelet) UpdatePodStatusCache(pod *v1.Pod) error {
 	kubecontainer_pod := &kubecontainer.Pod{ID: pod.UID, Name: pod.Name}
 

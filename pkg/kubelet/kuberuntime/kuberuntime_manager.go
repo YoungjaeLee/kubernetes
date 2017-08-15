@@ -777,6 +777,29 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 	}
 
+	// If the total amount of CpuQuota allocated to containers increases by resizing,
+	// the CpuQuata at pod-level should be updated before updating container-level CpuQuota.
+	if len(podContainerChanges.ContainersToResize) > 0 {
+		updatePodResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, format.Pod(pod))
+		currentPodCpuQuota := int64(0)
+		newPodCpuQuota := int64(0)
+
+		for _, container := range pod.Spec.Containers {
+			containerStatus := podStatus.FindContainerStatusByName(container.Name)
+			newLC := m.generateLinuxContainerResources(&container, pod)
+			currentPodCpuQuota += containerStatus.Resources.CpuQuota
+			newPodCpuQuota += newLC.CpuQuota
+		}
+
+		if newPodCpuQuota > currentPodCpuQuota {
+			if err := m.runtimeHelper.UpdatePodCgroup(pod); err != nil {
+				result.AddSyncResult(updatePodResult)
+				updatePodResult.Fail(err, "Update the pod's cgroup failed")
+				return
+			}
+		}
+	}
+
 	for containerId, idx := range podContainerChanges.ContainersToResize {
 		container := &pod.Spec.Containers[idx]
 		updateContainerResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, container.Name)
