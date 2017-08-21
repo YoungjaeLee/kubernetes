@@ -267,6 +267,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return nil, err
 	}
 
+	glog.Infof("In updateStatefulSet, currentRevision: %v, updateRevision: %v IsEqual: %v",
+		currentRevision.Revision, updateRevision.Revision, history.EqualRevision(currentRevision, updateRevision))
+
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
 	status.ObservedGeneration = new(int64)

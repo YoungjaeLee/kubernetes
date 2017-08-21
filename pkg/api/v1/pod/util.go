@@ -193,6 +193,30 @@ func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool
 	return true
 }
 
+func IsPodBeingResized(pod *v1.Pod) bool {
+	return !(IsPodResizedConditionDone(pod.Status) || IsPodResizedConditionFalse(pod.Status) || IsPodResizedConditionNA(pod.Status))
+}
+
+func IsPodResizedConditionDone(status v1.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == v1.ConditionDone
+}
+
+func IsPodResizedConditionFalse(status v1.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == v1.ConditionFalse
+}
+
+func IsPodResizedConditionNA(status v1.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition == nil
+}
+
+func GetPodResizedCondition(status v1.PodStatus) *v1.PodCondition {
+	_, condition := GetPodCondition(&status, v1.PodResized)
+	return condition
+}
+
 // GetContainerStatus extracts the status of container "name" from "statuses".
 // It also returns if "name" exists.
 func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.ContainerStatus, bool) {

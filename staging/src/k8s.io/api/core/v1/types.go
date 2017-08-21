@@ -2325,7 +2325,8 @@ type ContainerStateTerminated struct {
 }
 
 type ContainerStateResized struct {
-	ResizedAt metav1.Time `json:"resizedAt,omitempty" protobuf:"bytes,1,opt,name=resizedAt"`
+	ResizedAt   metav1.Time `json:"resizedAt,omitempty" protobuf:"bytes,1,opt,name=resizedAt"`
+	RequestedAt metav1.Time `json:"requestedAt,omitempty" protobuf:"bytes,2,opt,name=requestedAt"`
 }
 
 // ContainerState holds a possible state of container.

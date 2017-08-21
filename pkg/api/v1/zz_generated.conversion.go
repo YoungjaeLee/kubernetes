@@ -1110,6 +1110,7 @@ func Convert_api_ContainerState_To_v1_ContainerState(in *api.ContainerState, out
 
 func autoConvert_v1_ContainerStateResized_To_api_ContainerStateResized(in *v1.ContainerStateResized, out *api.ContainerStateResized, s conversion.Scope) error {
 	out.ResizedAt = in.ResizedAt
+	out.RequestedAt = in.RequestedAt
 	return nil
 }
 
@@ -1120,6 +1121,7 @@ func Convert_v1_ContainerStateResized_To_api_ContainerStateResized(in *v1.Contai
 
 func autoConvert_api_ContainerStateResized_To_v1_ContainerStateResized(in *api.ContainerStateResized, out *v1.ContainerStateResized, s conversion.Scope) error {
 	out.ResizedAt = in.ResizedAt
+	out.RequestedAt = in.RequestedAt
 	return nil
 }
 
