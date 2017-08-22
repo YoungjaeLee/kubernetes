@@ -143,6 +143,10 @@ func (g *GenericPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	return g.updateCache(pod, pid)
 }
 
+func (g *GenericPLEG) AddResizingEvent(podID types.UID) {
+	g.eventChannel <- &PodLifecycleEvent{ID: podID, Type: ContainerResized}
+}
+
 func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
 	if newState == oldState {
 		return nil

@@ -473,6 +473,35 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+// IsResizingDone checks whether the Resizing is done for all the container to be resized
+// by comparing the resource of the container's spec with the resources of the status
+func (m *kubeGenericRuntimeManager) IsResizingDone(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	isDone := false
+	apilcList := make(map[string]runtimeapi.LinuxContainerResources)
+
+	for _, container := range pod.Spec.Containers {
+		apilcList[container.Name] = m.generateLinuxContainerResources(&container, pod)
+	}
+
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.RState == kubecontainer.ContainerStateResized {
+			if apilc, exists := apilcList[containerStatus.Name]; exists {
+				if containerStatus.Resources.IsEqual_api(apilc) {
+					isDone = true
+				} else {
+					isDone = false
+					break
+				}
+			} else {
+				glog.Errorf("There is no container spec for %v", containerStatus.Name)
+				return false
+			}
+		}
+	}
+
+	return isDone
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)

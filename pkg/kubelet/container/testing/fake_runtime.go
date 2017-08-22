@@ -311,6 +311,10 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodS
 	return &status, f.Err
 }
 
+func (f *FakeRuntime) IsResizingDone(pod *v1.Pod, podStatus *PodStatus) bool {
+	return true
+}
+
 func (f *FakeDirectStreamingRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	f.Lock()
 	defer f.Unlock()

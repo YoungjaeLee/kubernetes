@@ -2325,8 +2325,7 @@ type ContainerStateTerminated struct {
 }
 
 type ContainerStateResized struct {
-	ResizedAt   metav1.Time `json:"resizedAt,omitempty" protobuf:"bytes,1,opt,name=resizedAt"`
-	RequestedAt metav1.Time `json:"requestedAt,omitempty" protobuf:"bytes,2,opt,name=requestedAt"`
+	ResizedAt metav1.Time `json:"resizedAt,omitempty" protobuf:"bytes,1,opt,name=resizedAt"`
 }
 
 // ContainerState holds a possible state of container.
@@ -4064,7 +4063,6 @@ const (
 type ResizeRequest struct {
 	RequestStatus ResizeStatus           `json:"requestStatus,omitempty" protobuf:"bytes,1,opt,name=requestStatus"`
 	NewResources  []ResourceRequirements `json:"newResource,omitempty" protobuf:"bytes,2,rep,name=newResources"`
-	UpdatedCtrs   []bool                 `json:"updatedCtrs,omitempty" protobuf:"bytes,3,rep,name=updatedCtrs"`
 }
 
 type ResizeAction string

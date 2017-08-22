@@ -179,11 +179,6 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 				})
 				pod.Spec.ResizeRequest.RequestStatus = api.ResizeNone
 				for idx, resources := range request.NewResources {
-					/*
-						if !request.UpdatedCtrs[idx] {
-							continue
-						}
-					*/
 					pod.Spec.Containers[idx].Resources = resources
 				}
 				pod.Spec.ResizeRequest = api.ResizeRequest{}

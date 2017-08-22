@@ -75220,9 +75220,6 @@
    },
    "io.k8s.api.core.v1.ContainerStateResized": {
     "properties": {
-     "requestedAt": {
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
      "resizedAt": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      }
@@ -78199,12 +78196,6 @@
      },
      "requestStatus": {
       "type": "string"
-     },
-     "updatedCtrs": {
-      "type": "array",
-      "items": {
-       "type": "boolean"
-      }
      }
     }
    },

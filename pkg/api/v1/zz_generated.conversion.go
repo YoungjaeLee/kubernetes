@@ -1110,7 +1110,6 @@ func Convert_api_ContainerState_To_v1_ContainerState(in *api.ContainerState, out
 
 func autoConvert_v1_ContainerStateResized_To_api_ContainerStateResized(in *v1.ContainerStateResized, out *api.ContainerStateResized, s conversion.Scope) error {
 	out.ResizedAt = in.ResizedAt
-	out.RequestedAt = in.RequestedAt
 	return nil
 }
 
@@ -1121,7 +1120,6 @@ func Convert_v1_ContainerStateResized_To_api_ContainerStateResized(in *v1.Contai
 
 func autoConvert_api_ContainerStateResized_To_v1_ContainerStateResized(in *api.ContainerStateResized, out *v1.ContainerStateResized, s conversion.Scope) error {
 	out.ResizedAt = in.ResizedAt
-	out.RequestedAt = in.RequestedAt
 	return nil
 }
 
@@ -4327,7 +4325,6 @@ func Convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(i
 func autoConvert_v1_ResizeRequest_To_api_ResizeRequest(in *v1.ResizeRequest, out *api.ResizeRequest, s conversion.Scope) error {
 	out.RequestStatus = api.ResizeStatus(in.RequestStatus)
 	out.NewResources = *(*[]api.ResourceRequirements)(unsafe.Pointer(&in.NewResources))
-	out.UpdatedCtrs = *(*[]bool)(unsafe.Pointer(&in.UpdatedCtrs))
 	return nil
 }
 
@@ -4339,7 +4336,6 @@ func Convert_v1_ResizeRequest_To_api_ResizeRequest(in *v1.ResizeRequest, out *ap
 func autoConvert_api_ResizeRequest_To_v1_ResizeRequest(in *api.ResizeRequest, out *v1.ResizeRequest, s conversion.Scope) error {
 	out.RequestStatus = v1.ResizeStatus(in.RequestStatus)
 	out.NewResources = *(*[]v1.ResourceRequirements)(unsafe.Pointer(&in.NewResources))
-	out.UpdatedCtrs = *(*[]bool)(unsafe.Pointer(&in.UpdatedCtrs))
 	return nil
 }
 

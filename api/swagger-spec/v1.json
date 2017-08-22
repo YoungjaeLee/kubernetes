@@ -22897,12 +22897,6 @@
       "items": {
        "$ref": "v1.ResourceRequirements"
       }
-     },
-     "updatedCtrs": {
-      "type": "array",
-      "items": {
-       "type": "boolean"
-      }
      }
     }
    },
@@ -23130,9 +23124,6 @@
     "id": "v1.ContainerStateResized",
     "properties": {
      "resizedAt": {
-      "type": "string"
-     },
-     "requestedAt": {
       "type": "string"
      }
     }

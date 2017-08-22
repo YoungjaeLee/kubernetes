@@ -3330,8 +3330,6 @@ func isResourceReqChanged(old, new core.ResourceRequirements, resourceName core.
 func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Container, resizeRequest *core.ResizeRequest, status *core.PodStatus, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
 	invalid := false
 	updated := false
-	// updatedCtrs[ctr_idx] = bool
-	// updatedCtrs := make(map[int]bool)
 
 	for i, oldCtr := range oldContainers {
 		for resourceName, _ := range helper.GetStandardContainerResources() {
@@ -3342,7 +3340,6 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Contai
 					allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources"), msg))
 					invalid = true
 				} else {
-					//updatedCtrs[i] = true
 					updated = true
 				}
 			}
@@ -3376,7 +3373,6 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Contai
 	// Build a resizeRequest.
 	resizeRequest.RequestStatus = core.ResizeRequested
 	resizeRequest.NewResources = make([]core.ResourceRequirements, len(newContainers))
-	resizeRequest.UpdatedCtrs = make([]bool, len(newContainers))
 
 	for i, _ := range oldContainers {
 		copyResources(&resizeRequest.NewResources[i], &newContainers[i].Resources)

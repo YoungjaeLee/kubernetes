@@ -2095,8 +2095,7 @@ type ContainerStateTerminated struct {
 }
 
 type ContainerStateResized struct {
-	ResizedAt   metav1.Time
-	RequestedAt metav1.Time
+	ResizedAt metav1.Time
 }
 
 // ContainerState holds a possible state of container.
@@ -3631,7 +3630,6 @@ const (
 type ResizeRequest struct {
 	RequestStatus ResizeStatus
 	NewResources  []ResourceRequirements
-	UpdatedCtrs   []bool
 }
 
 type ResizeAction string

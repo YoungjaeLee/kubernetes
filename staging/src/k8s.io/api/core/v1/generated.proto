@@ -654,8 +654,6 @@ message ContainerState {
 
 message ContainerStateResized {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time resizedAt = 1;
-
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time requestedAt = 2;
 }
 
 // ContainerStateRunning is a running state of a container.
@@ -3353,8 +3351,6 @@ message ResizeRequest {
   optional string requestStatus = 1;
 
   repeated ResourceRequirements newResources = 2;
-
-  repeated bool updatedCtrs = 3;
 }
 
 // Resizing resizes the resources allocated to a pod

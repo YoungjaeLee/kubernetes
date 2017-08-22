@@ -1624,6 +1624,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			if err := pcm.Update(pod); err != nil {
 				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 			}
+			kl.pleg.AddResizingEvent(pod.UID)
 		}
 	}
 	if err := result.Error(); err != nil {

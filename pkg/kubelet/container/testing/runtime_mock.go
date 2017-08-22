@@ -90,6 +90,11 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
+func (r *Mock) IsResizingDone(pod *v1.Pod, podStatus *PodStatus) bool {
+	args := r.Called(pod, podStatus)
+	return args.Get(0).(bool)
+}
+
 func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)

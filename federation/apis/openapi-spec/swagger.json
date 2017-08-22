@@ -12461,12 +12461,6 @@
      },
      "requestStatus": {
       "type": "string"
-     },
-     "updatedCtrs": {
-      "type": "array",
-      "items": {
-       "type": "boolean"
-      }
      }
     }
    },

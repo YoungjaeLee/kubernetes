@@ -1361,17 +1361,20 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 
 	if _, oldPodResized := podutil.GetPodCondition(&pod.Status, v1.PodResized); oldPodResized != nil {
 		if oldPodResized.Status == v1.ConditionAccepted {
-			isResizedDone := false
-			for _, containerStatus := range podStatus.ContainerStatuses {
-				if containerStatus.RState == kubecontainer.ContainerStateResized {
-					if !metav1.NewTime(containerStatus.ResizedAt).Before(oldPodResized.LastTransitionTime) {
-						isResizedDone = true
-					} else {
-						isResizedDone = false
-						break
+			isResizedDone := kl.containerRuntime.IsResizingDone(pod, podStatus)
+			/*
+				isResizedDone := false
+				for _, containerStatus := range podStatus.ContainerStatuses {
+					if containerStatus.RState == kubecontainer.ContainerStateResized {
+						if !metav1.NewTime(containerStatus.ResizedAt).Before(oldPodResized.LastTransitionTime) {
+							isResizedDone = true
+						} else {
+							isResizedDone = false
+							break
+						}
 					}
 				}
-			}
+			*/
 			if isResizedDone {
 				// To leverage the existing UpdatePodCondition, update the PodCondition of PodResized with it, then get it with GetPodCondition, and append it into the s.Conditions.
 				podutil.UpdatePodCondition(&pod.Status, &v1.PodCondition{

@@ -1571,7 +1571,6 @@ func (in *ContainerState) DeepCopy() *ContainerState {
 func (in *ContainerStateResized) DeepCopyInto(out *ContainerStateResized) {
 	*out = *in
 	in.ResizedAt.DeepCopyInto(&out.ResizedAt)
-	in.RequestedAt.DeepCopyInto(&out.RequestedAt)
 	return
 }
 
@@ -5056,11 +5055,6 @@ func (in *ResizeRequest) DeepCopyInto(out *ResizeRequest) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.UpdatedCtrs != nil {
-		in, out := &in.UpdatedCtrs, &out.UpdatedCtrs
-		*out = make([]bool, len(*in))
-		copy(*out, *in)
 	}
 	return
 }

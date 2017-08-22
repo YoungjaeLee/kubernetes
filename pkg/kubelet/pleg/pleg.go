@@ -32,6 +32,8 @@ const (
 	PodSync PodLifeCycleEventType = "PodSync"
 	// Do not use the events below because they are disabled in GenericPLEG.
 	ContainerChanged PodLifeCycleEventType = "ContainerChanged"
+
+	ContainerResized PodLifeCycleEventType = "ContainerResized"
 )
 
 // PodLifecycleEvent is an event that reflects the change of the pod state.
@@ -53,4 +55,5 @@ type PodLifecycleEventGenerator interface {
 
 	// used in SyncPod after updateContainer to update the PodState of the updated Pod.
 	UpdateCache(*kubecontainer.Pod, types.UID) error
+	AddResizingEvent(types.UID)
 }

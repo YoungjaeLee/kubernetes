@@ -122,6 +122,7 @@ type Runtime interface {
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
+	IsResizingDone(pod *v1.Pod, podStatus *PodStatus) bool
 }
 
 // DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
@@ -332,6 +333,28 @@ func (lc *LinuxContainerResources) ComputeResourceChanges(api_lc runtimeapi.Linu
 	*/
 
 	return changed, restartNeeded
+}
+
+func (lc *LinuxContainerResources) IsEqual_api(v runtimeapi.LinuxContainerResources) bool {
+	if lc.CpuPeriod != v.CpuPeriod {
+		return false
+	}
+	if lc.CpuQuota != v.CpuQuota {
+		return false
+	}
+	if lc.CpuShares != v.CpuShares {
+		return false
+	}
+	if lc.MemoryLimitInBytes != v.MemoryLimitInBytes {
+		return false
+	}
+	/* docker update doesn't support the update of OomScoreAdj
+	So, don't care about it.
+	if lc.OomScoreAdj != v.OomScoreAdj {
+		return false
+	}
+	*/
+	return true
 }
 
 func (lc *LinuxContainerResources) IsEqual(v *LinuxContainerResources) bool {
