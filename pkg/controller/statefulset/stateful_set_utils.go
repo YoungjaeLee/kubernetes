@@ -25,6 +25,7 @@ import (
 
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -137,6 +138,15 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	}
 	return true
 }
+func resourcesMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	for i, ctr := range pod.Spec.Containers {
+		setResources := set.Spec.Template.Spec.Containers[i].Resources
+		if !apiequality.Semantic.DeepEqual(ctr.Resources, setResources) {
+			return false
+		}
+	}
+	return true
+}
 
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
 // returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
@@ -199,6 +209,12 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
 }
 
+func updateResources(set *apps.StatefulSet, pod *v1.Pod) {
+	for i, ctr := range set.Spec.Template.Spec.Containers {
+		pod.Spec.Containers[i].Resources = ctr.Resources
+	}
+}
+
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
 func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
@@ -217,6 +233,10 @@ func isFailed(pod *v1.Pod) bool {
 // isTerminating returns true if pod's DeletionTimestamp has been set
 func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
+}
+
+func isBeingResized(pod *v1.Pod) bool {
+	return podutil.IsPodBeingResized(pod)
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated

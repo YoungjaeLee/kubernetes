@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/events"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -539,6 +540,13 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1alpha1.Table
 		row.Conditions = podSuccessConditions
 	case api.PodFailed:
 		row.Conditions = podFailedConditions
+	case api.PodRunning:
+		resizedCondition := podutil.GetPodResizedCondition(pod.Status)
+		if resizedCondition != nil && resizedCondition.Status != api.ConditionFalse {
+			str := fmt.Sprintf("Resizing%s", string(resizedCondition.Status))
+			strs := []string{reason, str}
+			reason = strings.Join(strs, ",")
+		}
 	}
 
 	initializing := false

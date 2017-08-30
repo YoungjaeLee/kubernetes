@@ -171,6 +171,21 @@ func IsPodBeingResized(pod *api.Pod) bool {
 	return !(IsPodResizedConditionDone(pod.Status) || IsPodResizedConditionFalse(pod.Status) || IsPodResizedConditionNA(pod.Status))
 }
 
+func IsPodResizedConditionRequested(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == api.ConditionRequested
+}
+
+func IsPodResizedConditionAccepted(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == api.ConditionAccepted
+}
+
+func IsPodResizedConditionRejected(status api.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == api.ConditionRejected
+}
+
 func IsPodResizedConditionDone(status api.PodStatus) bool {
 	condition := GetPodResizedCondition(status)
 	return condition != nil && condition.Status == api.ConditionDone

@@ -3295,6 +3295,10 @@ func isResourceReqChanged(old, new core.ResourceRequirements, resourceName core.
 					return true
 				}
 			}
+		} else {
+			if _, exists := old.Limits[resourceName]; exists {
+				return true
+			}
 		}
 	} else {
 		if new.Limits != nil {
@@ -3314,6 +3318,10 @@ func isResourceReqChanged(old, new core.ResourceRequirements, resourceName core.
 				if _, exists := new.Requests[resourceName]; exists {
 					return true
 				}
+			}
+		} else {
+			if _, exists := old.Requests[resourceName]; exists {
+				return true
 			}
 		}
 	} else {

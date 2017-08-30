@@ -106,6 +106,10 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 				return err
 			}
 		}
+		if !resourcesMatches(set, pod) {
+			updateResources(set, pod)
+			consistent = false
+		}
 		// if the Pod is not dirty, do nothing
 		if consistent {
 			return nil
