@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -396,6 +397,63 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				updateRevision.Name,
 				i)
 		}
+
+		if isResizingRejected(replicas[i]) {
+			if v1helper.GetResizeActionFromPodAnnotations(replicas[i].Annotations) == v1.ResizeActionLiveResize {
+				glog.V(4).Infof("StatefulSet %s/%s is rollbacking Pod %s w/ %s",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name, currentRevision.Name)
+				glog.Infof("StatefulSet %s/%s is rollbacking Pod %s w/ %s",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name, currentRevision.Name)
+				copy, err := scheme.Scheme.DeepCopy(replicas[i])
+				if err != nil {
+					return &status, err
+				}
+				replica := copy.(*v1.Pod)
+				setPodRevision(replica, currentRevision.Name)
+				if err := ssc.podControl.UpdateStatefulPod(currentSet, replica); err != nil {
+					glog.Infof("Failed to rollback the pod %s to %s", replica.Name, currentRevision.Name)
+					status.ResizingReplicas++
+				} else {
+					status.CurrentReplicas++
+				}
+				if getPodRevision(replicas[i]) == updateRevision.Name {
+					status.UpdatedReplicas--
+				}
+				if monotonic {
+					return &status, err
+				}
+				continue
+			} else {
+				glog.V(4).Infof("StatefulSet %s/%s is recreating resizing-rejected Pod %s w/ %s",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name, getPodRevision(replicas[i]))
+				glog.Infof("StatefulSet %s/%s is recreating resizing-rejected Pod %s w/ %s",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name, getPodRevision(replicas[i]))
+				if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+					return &status, err
+				}
+				if getPodRevision(replicas[i]) == currentRevision.Name {
+					status.CurrentReplicas--
+				} else if getPodRevision(replicas[i]) == updateRevision.Name {
+					status.UpdatedReplicas--
+				}
+				status.Replicas--
+				replicas[i] = newVersionedStatefulSetPod(
+					currentSet,
+					updateSet,
+					currentRevision.Name,
+					updateRevision.Name,
+					i)
+			}
+		}
+
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
@@ -442,8 +500,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isBeingResized(replicas[i]) && monotonic {
 			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas--
-				status.CurrentReplicas++
 			}
+			status.ResizingReplicas++
 			glog.Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Resized",
 				set.Namespace,
@@ -526,6 +584,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
+		glog.Infof("len(replicas): %v, pod: %v %v %v", len(replicas), replicas[target].Name, getPodRevision(replicas[target]), isTerminating(replicas[target]))
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
@@ -679,7 +738,7 @@ func isResizable(pod *v1.Pod, updateSet, set *apps.StatefulSet, ssc *defaultStat
 		for resourceName, _ := range apihelper.GetStandardContainerResources() {
 			apiv1ResourceName := v1.ResourceName(resourceName)
 			if isResourceReqChanged(ctr.Resources, updateSetPodSpec.Containers[i].Resources, apiv1ResourceName) {
-				if ctr.Resources.ResizePolicy[apiv1ResourceName] == v1.ResizeDisabled {
+				if ctr.Resources.ResizePolicy[apiv1ResourceName] != v1.ResizeLiveResizeable {
 					glog.Infof("%v is not live resizable")
 					return false
 				}

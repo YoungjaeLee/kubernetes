@@ -145,6 +145,9 @@ func resourcesMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 			return false
 		}
 	}
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+		return false
+	}
 	return true
 }
 
@@ -237,6 +240,10 @@ func isTerminating(pod *v1.Pod) bool {
 
 func isBeingResized(pod *v1.Pod) bool {
 	return podutil.IsPodBeingResized(pod)
+}
+
+func isResizingRejected(pod *v1.Pod) bool {
+	return podutil.IsPodResizedConditionRejected(pod.Status)
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated

@@ -436,3 +436,7 @@ func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinit
 	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
 	return nil
 }
+
+func GetResizeActionFromPodAnnotations(annotations map[string]string) v1.ResizeAction {
+	return v1.ResizeAction(annotations[v1.ResizeActionKey])
+}

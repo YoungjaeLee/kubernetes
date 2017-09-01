@@ -88,6 +88,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
+	attemptedResize := false
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
@@ -109,6 +110,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 		if !resourcesMatches(set, pod) {
 			updateResources(set, pod)
 			consistent = false
+			attemptedResize = true
 		}
 		// if the Pod is not dirty, do nothing
 		if consistent {
@@ -132,7 +134,11 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 		return updateErr
 	})
 	if attemptedUpdate {
-		spc.recordPodEvent("update", set, pod, err)
+		if attemptedResize {
+			spc.recordPodEvent("resize", set, pod, err)
+		} else {
+			spc.recordPodEvent("update", set, pod, err)
+		}
 	}
 	return err
 }
