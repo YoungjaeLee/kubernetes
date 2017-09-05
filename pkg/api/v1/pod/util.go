@@ -194,6 +194,9 @@ func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool
 }
 
 func IsPodBeingResized(pod *v1.Pod) bool {
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+		return true
+	}
 	return !(IsPodResizedConditionDone(pod.Status) || IsPodResizedConditionFalse(pod.Status) || IsPodResizedConditionNA(pod.Status))
 }
 
@@ -210,6 +213,11 @@ func IsPodResizedConditionDone(status v1.PodStatus) bool {
 func IsPodResizedConditionFalse(status v1.PodStatus) bool {
 	condition := GetPodResizedCondition(status)
 	return condition != nil && condition.Status == v1.ConditionFalse
+}
+
+func IsPodResizedConditionRequested(status v1.PodStatus) bool {
+	condition := GetPodResizedCondition(status)
+	return condition != nil && condition.Status == v1.ConditionRequested
 }
 
 func IsPodResizedConditionNA(status v1.PodStatus) bool {

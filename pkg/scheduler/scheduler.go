@@ -206,12 +206,14 @@ func (sched *Scheduler) resize(pod *v1.Pod) error {
 		pod = copied.(*v1.Pod)
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedResizing", "%v", err)
-		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-			Type:    v1.PodResized,
-			Status:  v1.ConditionRejected,
-			Reason:  v1.PodReasonUnresizable,
-			Message: err.Error(),
-		})
+		/*
+			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+				Type:    v1.PodResized,
+				Status:  v1.ConditionRejected,
+				Reason:  v1.PodReasonUnresizable,
+				Message: err.Error(),
+			})
+		*/
 	}
 	return err
 }
@@ -248,15 +250,17 @@ func (sched *Scheduler) do_resize(pod, resizedPod *v1.Pod, r *v1.Resizing) error
 		glog.V(1).Infof("Update resizing result failed: %v", err)
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedResizing", "%v", err)
-		if err1 := sched.config.SchedulerCache.ForgetResizedPod(pod, resizedPod); err1 != nil {
-			glog.Errorf("scheduler cache ForgetResizedPod failed: %v", err1)
+		if resizedPod != nil {
+			if err1 := sched.config.SchedulerCache.ForgetResizedPod(pod, resizedPod); err1 != nil {
+				glog.Errorf("scheduler cache ForgetResizedPod failed: %v", err1)
+			}
+			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+				Type:    v1.PodResized,
+				Status:  v1.ConditionRejected,
+				Reason:  v1.PodReasonResizerFailed,
+				Message: err.Error(),
+			})
 		}
-		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-			Type:    v1.PodResized,
-			Status:  v1.ConditionRejected,
-			Reason:  v1.PodReasonResizerFailed,
-			Message: err.Error(),
-		})
 	}
 
 	return err
@@ -513,16 +517,18 @@ func (sched *Scheduler) scheduleOne() {
 		return
 	}
 
-	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested ||
+		pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+		var resizedPod *v1.Pod
+
 		glog.V(3).Infof("Attempting to resize pod: %v/%v", pod.Namespace, pod.Name)
 		err := sched.resize(pod)
-		if err != nil {
-			return
-		}
-
-		resizedPod, err := sched.assumeResizedPod(pod)
-		if err != nil {
-			return
+		resizedPod = nil
+		if err == nil {
+			resizedPod, err = sched.assumeResizedPod(pod)
+			if err != nil {
+				return
+			}
 		}
 
 		go func() {

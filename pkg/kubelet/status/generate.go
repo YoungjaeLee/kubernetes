@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
@@ -139,4 +140,31 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 		Type:   v1.PodInitialized,
 		Status: v1.ConditionTrue,
 	}
+}
+
+func GeneratePodResizedCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus, isResizingDone func(*v1.Pod, *kubecontainer.PodStatus) bool) v1.PodCondition {
+	var conditionStatus v1.ConditionStatus
+
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeNone {
+		conditionStatus = v1.ConditionFalse
+	} else if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+		conditionStatus = v1.ConditionRequested
+	} else if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+		if isResizingDone(pod, podStatus) {
+			conditionStatus = v1.ConditionDone
+		} else {
+			conditionStatus = v1.ConditionAccepted
+		}
+	} else if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+		conditionStatus = v1.ConditionRejected
+	}
+
+	// To leverage the existing UpdatePodCondition, update the PodCondition of PodResized with it, then get it with GetPodCondition, and append it into the s.Conditions.
+	podutil.UpdatePodCondition(&pod.Status, &v1.PodCondition{
+		Type:   v1.PodResized,
+		Status: conditionStatus,
+	})
+	_, oldPodResized := podutil.GetPodCondition(&pod.Status, v1.PodResized)
+
+	return *oldPodResized
 }

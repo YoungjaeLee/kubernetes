@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -3364,15 +3363,10 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Contai
 		// For example, this is the case where a user applies the same newContainers[*].resources to cancel a presiously resizeRequest.
 		// Now, if for some reasons a resizeRequest is rejected, the scheduler just keeps trying to do that until it succeeds.
 		// So, it's kind of the only way to stop this retrying operation, other than killing the pod.
-		if resizeRequest.RequestStatus == core.ResizeRequested {
+		if resizeRequest.RequestStatus == core.ResizeRequested || resizeRequest.RequestStatus == core.ResizeRejected {
 			glog.Infof("Getting back to the original resource requirement")
 			*resizeRequest = core.ResizeRequest{}
-
-			podutil.UpdatePodCondition(status, &core.PodCondition{
-				Type:   core.PodResized,
-				Status: core.ConditionFalse,
-			})
-
+			resizeRequest.RequestStatus = core.ResizeNone
 		}
 
 		return allErrs, false
@@ -3390,12 +3384,6 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Contai
 		newContainers[i].Resources = core.ResourceRequirements{}
 		copyResources(&newContainers[i].Resources, &oldContainers[i].Resources)
 	}
-
-	podutil.UpdatePodCondition(status, &core.PodCondition{
-		Type:   core.PodResized,
-		Status: core.ConditionRequested,
-	})
-
 	/*
 		for i, v := range updatedCtrs {
 			if v {
@@ -3466,9 +3454,6 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	if stop {
 		return allErrs
 	}
-
-	glog.Infof("newPod: %v", newPod)
-	glog.Infof("oldPod: %v", oldPod)
 
 	// handle updateable fields by munging those fields prior to deep equal comparison.
 	mungedPod := *newPod
@@ -3564,7 +3549,7 @@ func ValidatePodResizing(resizing *core.Resizing) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("RequestStatus"), "empty result"))
 	}
 
-	if resizing.Request.RequestStatus != core.ResizeAccepted {
+	if resizing.Request.RequestStatus != core.ResizeAccepted && resizing.Request.RequestStatus != core.ResizeRejected {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("RequestStatus"), resizing.Request.RequestStatus, fmt.Sprintf("invalid value for RequestStatus.")))
 	}
 

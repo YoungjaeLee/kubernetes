@@ -1091,6 +1091,10 @@ func resizeRequestedNonTerminatedPod(pod *v1.Pod) bool {
 	}
 	if pod.Spec.ResizeRequest.RequestStatus != v1.ResizeRequested {
 		return false
+	} else {
+		if !podutil.IsPodResizedConditionRequested(pod.Status) {
+			return false
+		}
 	}
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -1243,7 +1247,7 @@ func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 							factory.volumeBinder.DeletePodBindings(pod)
 						}
 					}
-					if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+					if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 						podQueue.AddIfNotPresent(pod)
 					}
 					break

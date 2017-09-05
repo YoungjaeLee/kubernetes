@@ -1359,33 +1359,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Status: v1.ConditionTrue,
 	})
 
-	if _, oldPodResized := podutil.GetPodCondition(&pod.Status, v1.PodResized); oldPodResized != nil {
-		if oldPodResized.Status == v1.ConditionAccepted {
-			isResizedDone := kl.containerRuntime.IsResizingDone(pod, podStatus)
-			/*
-				isResizedDone := false
-				for _, containerStatus := range podStatus.ContainerStatuses {
-					if containerStatus.RState == kubecontainer.ContainerStateResized {
-						if !metav1.NewTime(containerStatus.ResizedAt).Before(oldPodResized.LastTransitionTime) {
-							isResizedDone = true
-						} else {
-							isResizedDone = false
-							break
-						}
-					}
-				}
-			*/
-			if isResizedDone {
-				// To leverage the existing UpdatePodCondition, update the PodCondition of PodResized with it, then get it with GetPodCondition, and append it into the s.Conditions.
-				podutil.UpdatePodCondition(&pod.Status, &v1.PodCondition{
-					Type:   v1.PodResized,
-					Status: v1.ConditionDone,
-				})
-				_, oldPodResized = podutil.GetPodCondition(&pod.Status, v1.PodResized)
-			}
-		}
-		s.Conditions = append(s.Conditions, *oldPodResized)
-	}
+	s.Conditions = append(s.Conditions, status.GeneratePodResizedCondition(pod, podStatus, kl.containerRuntime.IsResizingDone))
 
 	if kl.kubeClient != nil {
 		hostIP, err := kl.getHostIPAnyWay()

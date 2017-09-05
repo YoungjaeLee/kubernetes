@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -89,6 +90,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
 	attemptedResize := false
+	revision := getPodRevision(pod)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
@@ -111,6 +113,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 			updateResources(set, pod)
 			consistent = false
 			attemptedResize = true
+			setPodRevision(pod, revision)
 		}
 		// if the Pod is not dirty, do nothing
 		if consistent {
@@ -122,6 +125,8 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 		_, updateErr := spc.client.CoreV1().Pods(set.Namespace).Update(pod)
 		if updateErr == nil {
 			return nil
+		} else {
+			glog.Infof("updateErr: %v", updateErr)
 		}
 
 		if updated, err := spc.podLister.Pods(set.Namespace).Get(pod.Name); err == nil {

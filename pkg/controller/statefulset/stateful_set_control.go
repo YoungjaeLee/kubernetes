@@ -27,6 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -410,6 +411,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					replicas[i].Name, currentRevision.Name)
 				copy, err := scheme.Scheme.DeepCopy(replicas[i])
 				if err != nil {
+					glog.Infof("Failed to deepcopy to rollback the pod %s to %s", replicas[i].Name, currentRevision.Name)
 					return &status, err
 				}
 				replica := copy.(*v1.Pod)
@@ -503,10 +505,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 			status.ResizingReplicas++
 			glog.Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Resized",
+				"StatefulSet %s/%s is waiting for Pod %s to be Resized %v",
 				set.Namespace,
 				set.Name,
-				replicas[i].Name)
+				replicas[i].Name, podutil.GetPodResizedCondition(replicas[i].Status))
 			glog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Resized",
 				set.Namespace,
@@ -584,7 +586,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
-		glog.Infof("len(replicas): %v, pod: %v %v %v", len(replicas), replicas[target].Name, getPodRevision(replicas[target]), isTerminating(replicas[target]))
+		//glog.Infof("len(replicas): %v, pod: %v %v %v %v", len(replicas), replicas[target].Name, getPodRevision(replicas[target]), podutil.GetPodResizedCondition(replicas[target].Status), replicas[target].Spec.Containers[0].Resources)
+		glog.Infof("len(replicas): %v, pod: %v %v %v %v", len(replicas), replicas[target].Name, getPodRevision(replicas[target]), podutil.GetPodResizedCondition(replicas[target].Status), replicas[target].Spec.ResizeRequest)
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {

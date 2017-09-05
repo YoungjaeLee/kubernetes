@@ -145,7 +145,7 @@ func resourcesMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 			return false
 		}
 	}
-	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested || pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 		return false
 	}
 	return true

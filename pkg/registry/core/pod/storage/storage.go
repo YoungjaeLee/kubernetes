@@ -167,21 +167,23 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 		if pod.DeletionTimestamp != nil {
 			return nil, fmt.Errorf("pod %s is being deleted, cannot be resized.", pod.Name)
 		}
-		if pod.Spec.ResizeRequest.RequestStatus != api.ResizeRequested {
+		if pod.Spec.ResizeRequest.RequestStatus != api.ResizeRequested && pod.Spec.ResizeRequest.RequestStatus != api.ResizeRejected {
 			return nil, fmt.Errorf("pod %s is not being requested to be resized (%v).", pod.Name, pod.Spec.ResizeRequest.RequestStatus)
 		}
 
 		if request.RequestStatus == api.ResizeAccepted {
 			if reflect.DeepEqual(pod.Spec.ResizeRequest.NewResources, request.NewResources) {
-				podutil.UpdatePodCondition(&pod.Status, &api.PodCondition{
-					Type:   api.PodResized,
-					Status: api.ConditionAccepted,
-				})
-				pod.Spec.ResizeRequest.RequestStatus = api.ResizeNone
 				for idx, resources := range request.NewResources {
 					pod.Spec.Containers[idx].Resources = resources
 				}
 				pod.Spec.ResizeRequest = api.ResizeRequest{}
+				pod.Spec.ResizeRequest.RequestStatus = api.ResizeAccepted
+			} else {
+				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
+			}
+		} else if request.RequestStatus == api.ResizeRejected {
+			if reflect.DeepEqual(pod.Spec.ResizeRequest.NewResources, request.NewResources) {
+				pod.Spec.ResizeRequest.RequestStatus = api.ResizeRejected
 			} else {
 				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
 			}
