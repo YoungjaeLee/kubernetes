@@ -484,19 +484,19 @@ func (m *kubeGenericRuntimeManager) IsResizingDone(pod *v1.Pod, podStatus *kubec
 	}
 
 	for _, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.RState == kubecontainer.ContainerStateResized {
-			if apilc, exists := apilcList[containerStatus.Name]; exists {
-				if containerStatus.Resources.IsEqual_api(apilc) {
-					isDone = true
-				} else {
-					isDone = false
-					break
-				}
+		//if containerStatus.RState == kubecontainer.ContainerStateResized {
+		if apilc, exists := apilcList[containerStatus.Name]; exists {
+			if containerStatus.Resources.IsEqual_api(apilc) {
+				isDone = true
 			} else {
-				glog.Errorf("There is no container spec for %v", containerStatus.Name)
-				return false
+				isDone = false
+				break
 			}
+		} else {
+			glog.Errorf("There is no container spec for %v", containerStatus.Name)
+			return false
 		}
+		//}
 	}
 
 	return isDone
