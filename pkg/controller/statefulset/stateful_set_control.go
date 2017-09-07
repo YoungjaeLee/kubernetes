@@ -737,10 +737,10 @@ func isResizable(pod *v1.Pod, updateSet, set *apps.StatefulSet, ssc *defaultStat
 	}
 	glog.Infof("Only ResourceRequirements changed")
 
-	for i, ctr := range podSetPodSpec.Containers {
+	for i, ctr := range podSet.Spec.Template.Spec.Containers {
 		for resourceName, _ := range apihelper.GetStandardContainerResources() {
 			apiv1ResourceName := v1.ResourceName(resourceName)
-			if isResourceReqChanged(ctr.Resources, updateSetPodSpec.Containers[i].Resources, apiv1ResourceName) {
+			if isResourceReqChanged(ctr.Resources, updateSet.Spec.Template.Spec.Containers[i].Resources, apiv1ResourceName) {
 				if ctr.Resources.ResizePolicy[apiv1ResourceName] != v1.ResizeLiveResizeable {
 					glog.Infof("%v is not live resizable")
 					return false
