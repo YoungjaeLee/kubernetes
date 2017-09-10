@@ -28,7 +28,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	//"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
@@ -74,8 +74,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 	staticPodSpecs := map[string]v1.Pod{
 		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeAPIServer,
-			Image:         images.GetCoreImage(kubeadmconstants.KubeAPIServer, cfg.GetControlPlaneImageRepository(), cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
-			Command:       getAPIServerCommand(cfg, k8sVersion),
+			Image:         "localhost:5000/custom-k8s-images-for-master-sl",
+			Command:       []string{"/bin/sh"},
+			Args:          []string{"-c", "/run-custom-apiserver.sh"},
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer),
 			LivenessProbe: staticpodutil.ComponentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:     staticpodutil.ComponentResources("250m"),
@@ -83,8 +84,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeControllerManager,
-			Image:         images.GetCoreImage(kubeadmconstants.KubeControllerManager, cfg.GetControlPlaneImageRepository(), cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
-			Command:       getControllerManagerCommand(cfg, k8sVersion),
+			Image:         "localhost:5000/custom-k8s-images-for-master-sl",
+			Command:       []string{"/bin/sh"},
+			Args:          []string{"-c", "/run-custom-controller-manager.sh"},
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager),
 			LivenessProbe: staticpodutil.ComponentProbe(10252, "/healthz", v1.URISchemeHTTP),
 			Resources:     staticpodutil.ComponentResources("200m"),
@@ -92,8 +94,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeScheduler,
-			Image:         images.GetCoreImage(kubeadmconstants.KubeScheduler, cfg.GetControlPlaneImageRepository(), cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
-			Command:       getSchedulerCommand(cfg),
+			Image:         "localhost:5000/custom-k8s-images-for-master-sl",
+			Command:       []string{"/bin/sh"},
+			Args:          []string{"-c", "/run-custom-scheduler.sh"},
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler),
 			LivenessProbe: staticpodutil.ComponentProbe(10251, "/healthz", v1.URISchemeHTTP),
 			Resources:     staticpodutil.ComponentResources("100m"),
