@@ -70,13 +70,13 @@ spec:
     spec:
       containers:
       - name: kube-proxy
-        image: localhost:5000/custom-kube-proxy-iptables
+        image: localhost:5000/custom-kube-proxy-iptables-sl
         imagePullPolicy: IfNotPresent
         command:
         - /bin/bash
-		args:
-		- -c
-		- /run-custom-kube-proxy.sh
+        args:
+        - -c
+        - /run-custom-kube-proxy.sh
         {{ .ClusterCIDR }}
         securityContext:
           privileged: true
@@ -86,8 +86,8 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
-		- mountPath: /root
-		  name: root
+        - mountPath: /root
+          name: root
       hostNetwork: true
       serviceAccountName: kube-proxy
       tolerations:
@@ -104,5 +104,8 @@ spec:
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: root
+        hostPath:
+          path: /root
 `
 )
