@@ -92,15 +92,6 @@ func (in instrumentedInterface) CreateContainer(opts dockertypes.ContainerCreate
 	return out, err
 }
 
-func (in instrumentedInterface) UpdateContainer(id string, updateConfig dockercontainer.UpdateConfig) error {
-	const operation = "update_container"
-	defer recordOperation(operation, time.Now())
-
-	err := in.client.UpdateContainer(id, updateConfig)
-	recordError(operation, err)
-	return err
-}
-
 func (in instrumentedInterface) StartContainer(id string) error {
 	const operation = "start_container"
 	defer recordOperation(operation, time.Now())

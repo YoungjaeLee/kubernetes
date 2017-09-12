@@ -376,10 +376,6 @@ func (f *FakeDockerClient) popError(op string) error {
 	return nil
 }
 
-func (f *FakeDockerClient) UpdateContainer(id string, updateConfig dockercontainer.UpdateConfig) error {
-	return nil
-}
-
 // ListContainers is a test-spy implementation of Interface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {

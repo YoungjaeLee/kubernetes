@@ -418,7 +418,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				setPodRevision(replica, currentRevision.Name)
 				if err := ssc.podControl.UpdateStatefulPod(currentSet, replica); err != nil {
 					glog.Infof("Failed to rollback the pod %s to %s", replica.Name, currentRevision.Name)
-					status.ResizingReplicas++
 				} else {
 					status.CurrentReplicas++
 				}
@@ -503,7 +502,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas--
 			}
-			status.ResizingReplicas++
 			glog.Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Resized %v",
 				set.Namespace,
@@ -651,7 +649,7 @@ func getSetofPod(pod *v1.Pod, updateSet, set *apps.StatefulSet, ssc *defaultStat
 		return nil
 	}
 
-	podSet, err := applyRevision(set, podRevision)
+	podSet, err := ApplyRevision(set, podRevision)
 	if err != nil {
 		return nil
 	}

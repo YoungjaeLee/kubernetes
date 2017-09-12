@@ -254,19 +254,6 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 	return ds.client.StopContainer(containerID, time.Duration(timeout)*time.Second)
 }
 
-func (ds *dockerService) UpdateContainer(containerID string, resources *runtimeapi.LinuxContainerResources) error {
-	updateConfig := dockercontainer.UpdateConfig{}
-	updateConfig.Resources = dockercontainer.Resources{
-		CPUShares: resources.CpuShares,
-		CPUPeriod: resources.CpuPeriod,
-		CPUQuota:  resources.CpuQuota,
-		Memory:    resources.MemoryLimitInBytes,
-	}
-	err := ds.client.UpdateContainer(containerID, updateConfig)
-
-	return err
-}
-
 // RemoveContainer removes the container.
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.

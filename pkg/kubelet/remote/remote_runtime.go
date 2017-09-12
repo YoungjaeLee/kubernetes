@@ -213,21 +213,6 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 	return nil
 }
 
-func (r *RemoteRuntimeService) UpdateContainer(containerID string, resources *runtimeapi.LinuxContainerResources) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	_, err := r.runtimeClient.UpdateContainer(ctx, &runtimeapi.UpdateContainerRequest{
-		ContainerId: containerID,
-		Resources:   resources,
-	})
-	if err != nil {
-		glog.Errorf("UpdateContainer %q from runtime service failed: %v", containerID, err)
-		return err
-	}
-	return nil
-}
-
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
 	// Use timeout + default timeout (2 minutes) as timeout to leave extra time

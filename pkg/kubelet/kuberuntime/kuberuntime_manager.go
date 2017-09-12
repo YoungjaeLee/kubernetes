@@ -425,22 +425,22 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
 }
 
-func containerChanged(container *v1.Container, containerStatus *kubecontainer.ContainerStatus) (uint64, uint64, bool, bool) {
+func (m *kubeGenericRuntimeManager) containerChanged(container *v1.Container, containerStatus *kubecontainer.ContainerStatus, pod *v1.Pod) (uint64, uint64, bool, bool) {
 	needToRestart := false
 	liveResizable := false
 
 	if containerStatus.HashNoResources == 0 {
-		expectedHash := kubecontainer.HashContainer(&container)
+		expectedHash := kubecontainer.HashContainer(container)
 		needToRestart = containerStatus.Hash != expectedHash
 		return expectedHash, containerStatus.Hash, needToRestart, liveResizable
 	} else {
-		mungedContainer := container
+		mungedContainer := *container
 		mungedContainer.Resources = v1.ResourceRequirements{}
 		expectedHashNoResources := kubecontainer.HashContainer(&mungedContainer)
 		needToRestart = containerStatus.HashNoResources != expectedHashNoResources
 
 		if needToRestart == false {
-			newLC := m.generateLinuxContainerResources(&container, pod)
+			newLC := m.generateLinuxContainerResources(container, pod)
 			if changed, restartNeeded := containerStatus.Resources.ComputeResourceChanges(newLC); len(changed) > 0 {
 				for resource, _ := range changed {
 					if container.Resources.ResizePolicy[resource] == v1.ResizeRestartOnly {
@@ -457,8 +457,8 @@ func containerChanged(container *v1.Container, containerStatus *kubecontainer.Co
 				}
 			}
 		}
+		return expectedHashNoResources, containerStatus.HashNoResources, needToRestart, liveResizable
 	}
-	return expectedHashNoResources, containerStatus.HashNoResources, needToRestart, liveResizable
 }
 
 func shouldRestartOnFailure(pod *v1.Pod) bool {
@@ -585,7 +585,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// The container is running, but kill the container if any of the following condition is met.
 		reason := ""
 		restart := shouldRestartOnFailure(pod)
-		if expectedHash, actualHash, changed, liveResizable := containerChanged(&container, containerStatus); changed {
+		if expectedHash, actualHash, changed, liveResizable := m.containerChanged(&container, containerStatus, pod); changed {
 			reason = fmt.Sprintf("Container spec hash changed (%d vs %d).", actualHash, expectedHash)
 			// Restart regardless of the restart policy because the container
 			// spec changed.

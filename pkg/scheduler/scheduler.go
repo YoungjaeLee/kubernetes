@@ -198,12 +198,7 @@ func (sched *Scheduler) resize(pod *v1.Pod) error {
 	} else {
 		pod.Spec.ResizeRequest.RequestStatus = v1.ResizeRejected
 		glog.V(1).Infof("Failed to resize pod: %v/%v", pod.Namespace, pod.Name)
-		copied, cerr := api.Scheme.Copy(pod)
-		if cerr != nil {
-			runtime.HandleError(err)
-			return err
-		}
-		pod = copied.(*v1.Pod)
+		pod = pod.DeepCopy()
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedResizing", "%v", err)
 		/*

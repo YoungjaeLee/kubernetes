@@ -174,7 +174,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 
 func (m *kubeGenericRuntimeManager) updateContainer(containerId kubecontainer.ContainerID, container *v1.Container, pod *v1.Pod) (string, error) {
 	resources := m.generateLinuxContainerResources(container, pod)
-	err := m.runtimeService.UpdateContainer(containerId.ID, &resources)
+	err := m.runtimeService.UpdateContainerResources(containerId.ID, &resources)
 	if err != nil {
 		message := fmt.Sprintf("Failed to update container with id %v with error: %v", containerId, err)
 		m.recordContainerEvent(pod, container, containerId.ID, v1.EventTypeWarning, events.FailedToUpdateContainer, message)
