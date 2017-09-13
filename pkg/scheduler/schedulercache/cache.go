@@ -100,7 +100,7 @@ func (cache *schedulerCache) GetNodeNameToInfoMapforResizing(nodeNameToInfo map[
 		return fmt.Errorf("The node(%v) that the pod is supposed to be running on doesn't exist.", pod.Spec.NodeName)
 	}
 
-	err := nodeInfo.removePod(pod)
+	err := nodeInfo.RemovePod(pod)
 	if err != nil {
 		return err
 	}
