@@ -56,6 +56,7 @@ type SyncAction string
 const (
 	StartContainer   SyncAction = "StartContainer"
 	UpdateContainer  SyncAction = "UpdateContainr"
+	RestartContainer SyncAction = "RestartContainer"
 	KillContainer    SyncAction = "KillContainer"
 	SetupNetwork     SyncAction = "SetupNetwork"
 	TeardownNetwork  SyncAction = "TeardownNetwork"

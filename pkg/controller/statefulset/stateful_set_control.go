@@ -409,12 +409,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					set.Namespace,
 					set.Name,
 					replicas[i].Name, currentRevision.Name)
-				copy, err := scheme.Scheme.DeepCopy(replicas[i])
-				if err != nil {
-					glog.Infof("Failed to deepcopy to rollback the pod %s to %s", replicas[i].Name, currentRevision.Name)
-					return &status, err
-				}
-				replica := copy.(*v1.Pod)
+				replica := replicas[i].DeepCopy()
 				setPodRevision(replica, currentRevision.Name)
 				if err := ssc.podControl.UpdateStatefulPod(currentSet, replica); err != nil {
 					glog.Infof("Failed to rollback the pod %s to %s", replica.Name, currentRevision.Name)
@@ -609,6 +604,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					set.Namespace,
 					set.Name,
 					replicas[target].Name)
+				glog.Infof("StatefulSet %s/%s terminating Pod %s for update",
+					set.Namespace,
+					set.Name,
+					replicas[target].Name)
 				err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
 				status.CurrentReplicas--
 				return &status, err
@@ -739,7 +738,7 @@ func isResizable(pod *v1.Pod, updateSet, set *apps.StatefulSet, ssc *defaultStat
 		for resourceName, _ := range apihelper.GetStandardContainerResources() {
 			apiv1ResourceName := v1.ResourceName(resourceName)
 			if isResourceReqChanged(ctr.Resources, updateSet.Spec.Template.Spec.Containers[i].Resources, apiv1ResourceName) {
-				if ctr.Resources.ResizePolicy[apiv1ResourceName] != v1.ResizeLiveResizeable {
+				if ctr.Resources.ResizePolicy[apiv1ResourceName] == v1.ResizeDisabled {
 					glog.Infof("%v is not live resizable")
 					return false
 				}

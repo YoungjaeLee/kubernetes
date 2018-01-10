@@ -5261,6 +5261,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6821,6 +6833,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Resizing"
        }

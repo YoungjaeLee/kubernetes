@@ -11346,6 +11346,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Resizing"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1.Resizing"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Resizing"
        }
       ],
       "produces": [
@@ -13852,6 +13862,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Resizing"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1.Resizing"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Resizing"
        }
       ],

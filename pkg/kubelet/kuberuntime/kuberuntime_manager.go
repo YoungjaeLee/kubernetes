@@ -380,7 +380,8 @@ type podActions struct {
 	// ContainersToResize keeps a map of containers that need to be resized as is, note that
 	// the key is the container ID of the container, while
 	// the value is index of the container inside pod.Spec.Containers
-	ContainersToResize map[kubecontainer.ContainerID]int
+	ContainersToResize  map[kubecontainer.ContainerID]int
+	ContainersToRestart []int
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -485,6 +486,9 @@ func (m *kubeGenericRuntimeManager) IsResizingDone(pod *v1.Pod, podStatus *kubec
 
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		//if containerStatus.RState == kubecontainer.ContainerStateResized {
+		if containerStatus.State != kubecontainer.ContainerStateRunning {
+			continue
+		}
 		if apilc, exists := apilcList[containerStatus.Name]; exists {
 			if containerStatus.Resources.IsEqual_api(apilc) {
 				isDone = true
@@ -508,13 +512,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
 	changes := podActions{
-		KillPod:            createPodSandbox,
-		CreateSandbox:      createPodSandbox,
-		SandboxID:          sandboxID,
-		Attempt:            attempt,
-		ContainersToStart:  []int{},
-		ContainersToKill:   make(map[kubecontainer.ContainerID]containerToKillInfo),
-		ContainersToResize: make(map[kubecontainer.ContainerID]int),
+		KillPod:             createPodSandbox,
+		CreateSandbox:       createPodSandbox,
+		SandboxID:           sandboxID,
+		Attempt:             attempt,
+		ContainersToStart:   []int{},
+		ContainersToKill:    make(map[kubecontainer.ContainerID]containerToKillInfo),
+		ContainersToResize:  make(map[kubecontainer.ContainerID]int),
+		ContainersToRestart: []int{},
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -608,7 +613,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		message := reason
 		if restart {
 			message = fmt.Sprintf("%s. Container will be killed and recreated.", message)
-			changes.ContainersToStart = append(changes.ContainersToStart, idx)
+			changes.ContainersToRestart = append(changes.ContainersToRestart, idx)
 		}
 
 		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
@@ -619,7 +624,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		glog.V(2).Infof("Container %q (%q) of pod %s: %s", container.Name, containerStatus.ID, format.Pod(pod), message)
 	}
 
-	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+	if keepCount == 0 && len(changes.ContainersToStart) == 0 && len(changes.ContainersToRestart) == 0 {
 		changes.KillPod = true
 	}
 
@@ -808,7 +813,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 
 	// If the total amount of CpuQuota allocated to containers increases by resizing,
 	// the CpuQuata at pod-level should be updated before updating container-level CpuQuota.
-	if len(podContainerChanges.ContainersToResize) > 0 {
+	if len(podContainerChanges.ContainersToResize) > 0 || len(podContainerChanges.ContainersToResize) > 0 {
 		updatePodResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, format.Pod(pod))
 		currentPodCpuQuota := int64(0)
 		newPodCpuQuota := int64(0)
@@ -826,6 +831,34 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 				updatePodResult.Fail(err, "Update the pod's cgroup failed")
 				return
 			}
+		}
+	}
+
+	// Step 7: start containers in podContainerChanges.ContainersToRestart.
+	for _, idx := range podContainerChanges.ContainersToRestart {
+		container := &pod.Spec.Containers[idx]
+		restartContainerResult := kubecontainer.NewSyncResult(kubecontainer.RestartContainer, container.Name)
+		result.AddSyncResult(restartContainerResult)
+
+		isInBackOff, msg, err := m.doBackOff(pod, container, podStatus, backOff)
+		if isInBackOff {
+			restartContainerResult.Fail(err, msg)
+			glog.V(4).Infof("Backing Off restarting container %+v in pod %v", container, format.Pod(pod))
+			continue
+		}
+
+		glog.V(4).Infof("Restarting container %+v in pod %v", container, format.Pod(pod))
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
+			restartContainerResult.Fail(err, msg)
+			// known errors that are logged in other places are logged at higher levels here to avoid
+			// repetitive log spam
+			switch {
+			case err == images.ErrImagePullBackOff:
+				glog.V(3).Infof("container start failed: %v: %s", err, msg)
+			default:
+				utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			}
+			continue
 		}
 	}
 

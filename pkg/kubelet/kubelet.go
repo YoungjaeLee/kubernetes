@@ -1626,6 +1626,12 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			}
 			kl.pleg.AddResizingEvent(pod.UID)
 		}
+		if syncResult.Action == kubecontainer.RestartContainer && syncResult.Error == nil {
+			// The pod might have been resized, so it needs to update its cgroup.
+			if err := pcm.Update(pod); err != nil {
+				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
+		}
 	}
 	if err := result.Error(); err != nil {
 		// Do not record an event here, as we keep all event logging for sync pod failures
