@@ -136,7 +136,7 @@ func (r *ResizingREST) New() runtime.Object {
 
 var _ = rest.Creater(&ResizingREST{})
 
-func (r *ResizingREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (out runtime.Object, err error) {
+func (r *ResizingREST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (out runtime.Object, err error) {
 	resizing := obj.(*api.Resizing)
 
 	if errs := validation.ValidatePodResizing(resizing); len(errs) != 0 {

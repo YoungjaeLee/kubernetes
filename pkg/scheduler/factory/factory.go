@@ -212,17 +212,17 @@ func NewConfigFactory(
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
-					if err := c.podQueue.Add(obj); err != nil {
+					if err := c.podQueue.Add(obj.(*v1.Pod)); err != nil {
 						runtime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
 					}
 				},
 				UpdateFunc: func(oldObj, newObj interface{}) {
-					if err := c.podQueue.Update(newObj); err != nil {
+					if err := c.podQueue.Update(newObj.(*v1.Pod)); err != nil {
 						runtime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 					}
 				},
 				DeleteFunc: func(obj interface{}) {
-					if err := c.podQueue.Delete(obj); err != nil {
+					if err := c.podQueue.Delete(obj.(*v1.Pod)); err != nil {
 						runtime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 					}
 				},

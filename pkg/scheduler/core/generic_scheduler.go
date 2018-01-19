@@ -135,7 +135,7 @@ func (g *genericScheduler) Resize(pod *v1.Pod, nodeLister algorithm.NodeLister) 
 		pod.Spec.Containers[ctr_idx].Resources = newResource
 	}
 
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue)
 	for ctr_idx, _ := range pod.Spec.ResizeRequest.NewResources {
 		/*
 			if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
