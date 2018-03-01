@@ -1,12 +1,7 @@
 # Kubernetes with live and in-place vertical scaling
-
-[![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
-
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
-
 ----
 
-* For the original README.md, refer to README.k8s.md.
+For the original README.md, refer to README.k8s.md.
 
 This is the repo for Kubernetes with live and in-place vertical scaling that is being developed in IBM Austin Research team.
 
@@ -40,29 +35,41 @@ root@master:~#
 3. Run 'kubeadm init --ignore-preflight-errors=FileExisting-crictl,Swap’ on the master.
 [https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/)
 
-4. Install Calico
+4. Install Calico.
+
 kubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
+
 [https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm)
 
 5. On worker nodes, run the ‘kubeadm join’ command that was output by the previous ‘kubeadm init’.
 
 6. On the master and worker nodes, get the kubelet/kubectl binary with vertical scaling.
+
 Avaliable at [http://arlab224.austin.ibm.com:8000/_output/bin/kubelet](http://arlab224.austin.ibm.com:8000/_output/bin/kubelet), [http://arlab224.austin.ibm.com:8000/_output/bin/kubectl](http://arlab224.austin.ibm.com:8000/_output/bin/kubectl)
 
 7. On the master and worker nodes, restart kubelet with the new binary. (systemctl stop kubelet, copy the new binary into /usr/bin/kubelet, system start kubelet)
-with 'kubectl get nodes’, you should see that on nodes custom kubelet is running.
+
+With 'kubectl get nodes’, you should see that on nodes custom kubelet is running.
+
+```
 root@master:~# kubectl  get nodes 
 NAME       STATUS    ROLES     AGE       VERSION 
 master     Ready     master    1h        v1.10.0-alpha.1.755+5c1eeb1b172242-dirty
 worker-1   Ready     <none>    1h        v1.10.0-alpha.1.755+5c1eeb1b172242-dirty
+```
 
-8. On the master node, modify manifest yaml files (located at /etc/kubernetes/manifest) for apiserver, scheduler, and controller-manager to use the corresponding image of each with vertical scaling from ‘youngjaelee’ repository
-for scheduler, modify the line for ‘image’ to ‘image:youngjaelee/kube-scheduler-vscaling:021318’ in /etc/kubernetes/kube-scheduler.yaml.
-for apiserver, ‘image:youngjaee/kube-apiserver-vscaling:021318’ in /etc/kubernetes/kube-apiserver.yaml.
-for controller-manager, ‘image:youngjaelee/kube-controller-manager-vscaling:021318’ in /etc/kubernetes/kube-controller-manager.yaml.
+8. On the master node, modify manifest yaml files (located at /etc/kubernetes/manifest) for apiserver, scheduler, and controller-manager to use the corresponding image of each with vertical scaling from ‘youngjaelee’ repository.
+
+For scheduler, modify the line for ‘image’ to ‘image:youngjaelee/kube-scheduler-vscaling:021318’ in /etc/kubernetes/kube-scheduler.yaml.
+
+For apiserver, ‘image:youngjaee/kube-apiserver-vscaling:021318’ in /etc/kubernetes/kube-apiserver.yaml.
+
+For controller-manager, ‘image:youngjaelee/kube-controller-manager-vscaling:021318’ in /etc/kubernetes/kube-controller-manager.yaml.
+
 After modifying all these files, restart Kubetlet via systemctl restart kubelet.
 
 9. If in output by kubelet get pods —all-namespaces, you see running pods for scheduler, apiserver, and controller-manager like the following, the switch to vertical scaling version is done.
+
 root@master:~# kubectl  get pods --all-namespaces 
 NAMESPACE     NAME                                      READY     STATUS    RESTARTS   AGE 
 kube-system   calico-etcd-fx9nb                         1/1       Running   1          1h 
