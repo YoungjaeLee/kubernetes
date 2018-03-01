@@ -1,4 +1,4 @@
-# Kubernetes
+# Kubernetes with live and in-place vertical scaling
 
 [![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
 
@@ -6,81 +6,80 @@
 
 ----
 
-Kubernetes is an open source system for managing [containerized applications]
-across multiple hosts, providing basic mechanisms for deployment, maintenance,
-and scaling of applications.
+* For the original README.md, refer to README.k8s.md.
 
-Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
-combined with best-of-breed ideas and practices from the community.
+This is the repo for Kubernetes with live and in-place vertical scaling that is being developed in IBM Austin Research team.
 
-Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
-If you are a company that wants to help shape the evolution of
-technologies that are container-packaged, dynamically-scheduled
-and microservices-oriented, consider joining the CNCF.
-For details about who's involved and how Kubernetes plays a role,
-read the CNCF [announcement].
+The main working branch is `qos-master`, which is periodically synced with the upstream master branch by rebase.
 
 ----
 
-## To start using Kubernetes
+## Getting started.
 
-See our documentation on [kubernetes.io].
+If you're familiar with k8s enough to know how to update k8s' binaries of an existing k8s cluster, build binaries and update the binaries of API server, scheduler, resource-controller, and kubelet on master/worker nodes of your cluster.
 
-Try our [interactive tutorial].
+Otherwise, please follow the following steps to install a new k8s cluster with live and in-place vertical scaling.
 
-Take a free course on [Scalable Microservices with Kubernetes].
+1. Install docker, kubeadm, kubelet, and kubectl. 
+[https://kubernetes.io/docs/setup/independent/install-kubeadm/](https://kubernetes.io/docs/setup/independent/install-kubeadm/)
 
-## To start developing Kubernetes
+2. Unless swap is disabled, add '--fail-swap-on=false’ to kubelet’s config file located at /etc/systemd/system/kubelet.service.d/10-kubeadm.conf and run ‘systemctl daemon-reload’.
+root@master:~# cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf 
+[Service] 
+Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf" 
+Environment="KUBELET_SYSTEM_PODS_ARGS=--pod-manifest-path=/etc/kubernetes/manifests --allow-privileged=true" 
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin" 
+Environment="KUBELET_DNS_ARGS=--cluster-dns=10.96.0.10 --cluster-domain=cluster.local" 
+Environment="KUBELET_AUTHZ_ARGS=--authorization-mode=Webhook --client-ca-file=/etc/kubernetes/pki/ca.crt" 
+Environment="KUBELET_CADVISOR_ARGS=--cadvisor-port=0" 
+Environment="KUBELET_CERTIFICATE_ARGS=--rotate-certificates=true --cert-dir=/var/lib/kubelet/pki" 
+ExecStart= 
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_SYSTEM_PODS_ARGS $KUBELET_NETWORK_ARGS $KUBELET_DNS_ARGS $KUBELET_AUTHZ_ARGS $KUBELET_CADVISOR_ARGS $KUBELET_CERTIFICATE_ARGS $KUBELET_EXTRA_ARGS --fail-swap-on=false
+root@master:~# 
 
-The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
+3. Run 'kubeadm init --ignore-preflight-errors=FileExisting-crictl,Swap’ on the master.
+[https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/)
 
-If you want to build Kubernetes right away there are two options:
+4. Install Calico
+kubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
+[https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm)
 
-##### You have a working [Go environment].
+5. On worker nodes, run the ‘kubeadm join’ command that was output by the previous ‘kubeadm init’.
 
-```
-$ go get -d k8s.io/kubernetes
-$ cd $GOPATH/src/k8s.io/kubernetes
-$ make
-```
+6. On the master and worker nodes, get the kubelet/kubectl binary with vertical scaling.
+Avaliable at [http://arlab224.austin.ibm.com:8000/_output/bin/kubelet](http://arlab224.austin.ibm.com:8000/_output/bin/kubelet), [http://arlab224.austin.ibm.com:8000/_output/bin/kubectl](http://arlab224.austin.ibm.com:8000/_output/bin/kubectl)
 
-##### You have a working [Docker environment].
+7. On the master and worker nodes, restart kubelet with the new binary. (systemctl stop kubelet, copy the new binary into /usr/bin/kubelet, system start kubelet)
+with 'kubectl get nodes’, you should see that on nodes custom kubelet is running.
+root@master:~# kubectl  get nodes 
+NAME       STATUS    ROLES     AGE       VERSION 
+master     Ready     master    1h        v1.10.0-alpha.1.755+5c1eeb1b172242-dirty
+worker-1   Ready     <none>    1h        v1.10.0-alpha.1.755+5c1eeb1b172242-dirty
 
-```
-$ git clone https://github.com/kubernetes/kubernetes
-$ cd kubernetes
-$ make quick-release
-```
+8. On the master node, modify manifest yaml files (located at /etc/kubernetes/manifest) for apiserver, scheduler, and controller-manager to use the corresponding image of each with vertical scaling from ‘youngjaelee’ repository
+for scheduler, modify the line for ‘image’ to ‘image:youngjaelee/kube-scheduler-vscaling:021318’ in /etc/kubernetes/kube-scheduler.yaml.
+for apiserver, ‘image:youngjaee/kube-apiserver-vscaling:021318’ in /etc/kubernetes/kube-apiserver.yaml.
+for controller-manager, ‘image:youngjaelee/kube-controller-manager-vscaling:021318’ in /etc/kubernetes/kube-controller-manager.yaml.
+After modifying all these files, restart Kubetlet via systemctl restart kubelet.
 
-For the full story, head over to the [developer's documentation].
+9. If in output by kubelet get pods —all-namespaces, you see running pods for scheduler, apiserver, and controller-manager like the following, the switch to vertical scaling version is done.
+root@master:~# kubectl  get pods --all-namespaces 
+NAMESPACE     NAME                                      READY     STATUS    RESTARTS   AGE 
+kube-system   calico-etcd-fx9nb                         1/1       Running   1          1h 
+kube-system   calico-kube-controllers-d554689d5-dh962   1/1       Running   3          1h 
+kube-system   calico-node-gnxhx                         2/2       Running   3          1h 
+kube-system   calico-node-rm765                         2/2       Running   2          1h 
+kube-system   etcd-master                               1/1       Running   0          1h 
+kube-system   kube-apiserver-master                     1/1       Running   0          5m 
+kube-system   kube-controller-manager-master            1/1       Running   0          5m 
+kube-system   kube-dns-6f4fd4bdf-xk9l9                  3/3       Running   3          1h 
+kube-system   kube-proxy-5cc8h                          1/1       Running   1          1h 
+kube-system   kube-proxy-g6rqw                          1/1       Running   1          1h 
+kube-system   kube-scheduler-master                     1/1       Running   0          5m 
+root@master:~# 
+
 
 ## Support
 
-If you need support, start with the [troubleshooting guide]
-and work your way through the process that we've outlined.
+If you have questions, reach out to us (leeyo@us.ibm.com)
 
-That said, if you have questions, reach out to us
-[one way or another][communication].
-
-[announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html
-[CNCF]: https://www.cncf.io/about
-[communication]: https://github.com/kubernetes/community/blob/master/communication.md
-[community repository]: https://github.com/kubernetes/community
-[containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://github.com/kubernetes/community/tree/master/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://golang.org/doc/install
-[GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
-[interactive tutorial]: http://kubernetes.io/docs/tutorials/kubernetes-basics
-[kubernetes.io]: http://kubernetes.io
-[Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[Submit Queue]: http://submit-queue.k8s.io/#/ci
-[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
