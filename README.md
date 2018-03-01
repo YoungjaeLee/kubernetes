@@ -7,6 +7,8 @@ This is the repo for Kubernetes with live and in-place vertical scaling that is 
 
 The main working branch is `qos-master`, which is periodically synced with the upstream master branch by rebase.
 
+You can find its design proposal at [here](https://github.com/YoungjaeLee/community/blob/live-inplace-vertical-scaling/contributors/design-proposals/live-and-inplace-vertical-scaling.md)
+
 ----
 
 ## Getting started.
@@ -92,7 +94,152 @@ kube-system   kube-scheduler-master                     1/1       Running   0   
 root@master:~# 
 ```
 
+## Examples
+
+1. Example of a stand-alone pod vertical scaling
+
+* This is the yaml file of a pod to be created.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+    name: ubuntu
+spec:
+    restartPolicy: Always
+    containers:
+    - name: ubuntu
+      image: ubuntu:16.04
+      command: ["/bin/bash"]
+      stdin: true
+      tty: true
+      resources:
+        limits:
+            cpu: 10
+            memory: "2Gi"
+        requests:
+            cpu: 2
+            memory: "1Gi"
+        resizePolicy:
+            cpu: "LiveResizable"
+            memory: "LiveResizable"
+```
+
+* Creating the pod.
+
+```
+# kubectl create -f pod.yaml
+pod "ubuntu" created
+```
+
+* The resources allocated to the pod on the k8s.
+
+```
+# kubectl get pod ubuntu -o json | jq .spec.containers[0].resources, .spec.nodeName, .status.conditions
+```
+
+```yaml
+{
+  "limits": {
+    "cpu": "10",
+    "memory": "2Gi"
+  },
+  "requests": {
+    "cpu": "2",
+    "memory": "1Gi"
+  },
+  "resizePolicy": {
+    "cpu": "LiveResizable",
+    "memory": "LiveResizable"
+  }
+}
+"10.11.12.67"
+[
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:45Z",
+    "status": "True",
+    "type": "Initialized"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:47Z",
+    "status": "True",
+    "type": "Ready"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:45Z",
+    "status": "True",
+    "type": "PodScheduled"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:45Z",
+    "status": "False",
+    "type": "PodResized"
+  }
+]
+```
+
+* Resizing the pod (increasing the cpu's request to 4 and the the memory's request to 2Gi.), (increasing the cpu's limit to 16 and the the memory's limit to 3Gi.)
+
+```
+# kubectl patch pod ubuntu -p '{spec:{containers:[{name:ubuntu,resources:{requests:{cpu:4, memory:2Gi}, limits:{cpu:16,memory:3Gi}}}]}}'
+pod "ubuntu" patched
+```
+
+* The resized resources of the pod on the k8s.
+
+```
+# kubectl get pod ubuntu -o json | jq '.spec.containers[0].resources, .spec.nodeName, .status.conditions'
+```
+
+```yaml
+{
+  "limits": {
+    "cpu": "16",
+    "memory": "3Gi"
+  },
+  "requests": {
+    "cpu": "4",
+    "memory": "2Gi"
+  },
+  "resizePolicy": {
+    "cpu": "LiveResizable",
+    "memory": "LiveResizable"
+  }
+}
+"10.11.12.67"
+[
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:45Z",
+    "status": "True",
+    "type": "Initialized"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:47Z",
+    "status": "True",
+    "type": "Ready"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:19:45Z",
+    "status": "True",
+    "type": "PodScheduled"
+  },
+  {
+    "lastProbeTime": null,
+    "lastTransitionTime": "2018-03-01T22:34:23Z",
+    "status": "Done",
+    "type": "PodResized"
+  }
+]
+```
+
 ## Support
 
-If you have questions, reach out to us (leeyo@us.ibm.com)
+If you have questions, reach out to us (leeyo@us.ibm.com, karthick@us.ibm.com)
 
