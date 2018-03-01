@@ -96,7 +96,7 @@ root@master:~#
 
 ## Examples
 
-1. Example of a stand-alone pod vertical scaling
+1. Stand-alone pod vertical scaling
 
 * This is the yaml file of a pod to be created.
 
@@ -238,6 +238,118 @@ pod "ubuntu" patched
   }
 ]
 ```
+
+2.  Statefulsets w/ multiple pods vertical scarling
+
+* A StatefulSet to be created.
+
+```yaml
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: "mongo"
+  replicas: 2
+  updateStrategy:
+    type: "RollingUpdate"
+  template:
+    metadata:
+      labels:
+        role: mongo
+        environment: test
+      annotations:
+        resizeAction: LiveResize
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: mongo
+          image: mongo
+          command:
+            - mongod
+            - "--replSet"
+            - rs0
+            - "--smallfiles"
+            - "--noprealloc"
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-persistent-storage
+              mountPath: /data/db
+          resources:
+            requests:
+              cpu: "2"
+              memory: "1Gi"
+            limits:
+              cpu: "6"
+              memory: "3Gi"
+            resizePolicy:
+              cpu: "LiveResizeable"
+        - name: mongo-sidecar
+          image: cvallance/mongo-k8s-sidecar
+          env:
+            - name: MONGO_SIDECAR_POD_LABELS
+              value: "role=mongo,environment=test"
+      volumes:
+      - name: mongo-persistent-storage
+        hostPath:
+          path: /root/mongdb
+```
+
+* Creating the StatefulSet.....
+
+```
+# kubectl create -f statefulset-sl.yaml
+statefulset "mongo" created
+```
+
+* The resources allocated to the pod on the k8s.
+
+```yaml
+# kubectl get statefulset mongo -o json | jq .spec.template.spec.containers[0].resources
+{
+  "limits": {
+    "cpu": "6",
+    "memory": "3Gi"
+  },
+  "requests": {
+    "cpu": "2",
+    "memory": "1Gi"
+  },
+  "resizePolicy": {
+    "cpu": "LiveResizeable",
+    "memory": "Disabled"
+  }
+}
+```
+
+* Resizing the pod (decreasing the request/limit of CPU to 3/8.)
+
+```
+# kubectl patch statefulset mongo -p '{spec:{template:{spec:{containers:[{name:mongo,resources:{requests:{cpu:3}, limits:{cpu:8}}}]}}}}'
+statefulset "mongo" patched
+```
+
+* The resized resources of the pod on the k8s.
+
+```yaml
+# kubectl get statefulset mongo -o json | jq .spec.template.spec.containers[0].resources
+{
+  "limits": {
+    "cpu": "8",
+    "memory": "3Gi"
+  },
+  "requests": {
+    "cpu": "3",
+    "memory": "1Gi"
+  },
+  "resizePolicy": {
+    "cpu": "LiveResizeable",
+    "memory": "Disabled"
+  }
+}
+```
+
 
 ## Support
 
