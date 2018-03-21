@@ -122,6 +122,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		case *predicates.InsufficientReservationError:
+			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			message = re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		case *predicates.FailureReason:
 			reason = re.GetReason()
 			message = fmt.Sprintf("Failure: %s", re.GetReason())

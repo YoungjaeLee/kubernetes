@@ -40,6 +40,13 @@ type matchingPodAntiAffinityTerm struct {
 	node *v1.Node
 }
 
+type ResourceReservation struct {
+	name    string
+	Request *schedulercache.Resource
+	cpu     bool
+	mem     bool
+}
+
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
 // RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
 type predicateMetadata struct {
@@ -52,6 +59,7 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	podReservationResource             *ResourceReservation
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
@@ -92,6 +100,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		podRequest:                GetResourceRequest(pod),
 		podPorts:                  schedutil.GetContainerPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
+		podReservationResource:    GetResourceReservation(pod),
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		glog.V(10).Infof("Precompute: %v", predicateName)

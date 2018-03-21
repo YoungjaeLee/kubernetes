@@ -2603,8 +2603,9 @@ type PodSpec struct {
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
 	// +optional
-	DNSConfig     *PodDNSConfig
-	ResizeRequest ResizeRequest
+	DNSConfig           *PodDNSConfig
+	ResizeRequest       ResizeRequest
+	ResourceReservation ResourceReservation
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -3641,6 +3642,11 @@ const (
 	ResizeActionLiveResize          ResizeAction = "LiveResize"
 	ResizeActionLiveResizePreferred ResizeAction = "LiveResizePreferred"
 )
+
+type ResourceReservation struct {
+	Name      string
+	Resources ResourceRequirements
+}
 
 // +genclient
 // +genclient:nonNamespaced

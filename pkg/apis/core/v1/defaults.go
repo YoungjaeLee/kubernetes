@@ -191,6 +191,13 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		obj.Spec.ResizeRequest.RequestStatus = v1.ResizeNone
 	}
 }
+
+func SetDefaults_ResourceReservation(obj *v1.ResourceReservation) {
+	if obj.Name == "" {
+		obj.Name = "None"
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.DNSPolicy == "" {
 		obj.DNSPolicy = v1.DNSClusterFirst

@@ -60,6 +60,130 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	generation int64
+
+	reservedResource     *Resource
+	resourceReservations ResourceReservationList
+}
+
+type ResourceReservationList map[string]*ResourceReservation
+
+type ResourceReservation struct {
+	usedResource      *Resource
+	reservedResource  *Resource
+	perPodReservation map[string]*Resource
+}
+
+func NewResourceReservation() *ResourceReservation {
+	rr := &ResourceReservation{
+		reservedResource:  &Resource{},
+		usedResource:      &Resource{},
+		perPodReservation: make(map[string]*Resource),
+	}
+
+	return rr
+}
+
+func (rr *ResourceReservation) UsedResource() Resource {
+	if rr == nil {
+		return emptyResource
+	}
+	return *rr.usedResource
+}
+
+func (rr *ResourceReservation) ReservedResource() Resource {
+	if rr == nil {
+		return emptyResource
+	}
+	return *rr.reservedResource
+}
+
+func (rr *ResourceReservation) addPod(pod *v1.Pod) {
+	r := rr.reservedResource
+	rl := pod.Spec.ResourceReservation.Resources.Requests
+
+	rr.perPodReservation[pod.Name] = NewResource(pod.Spec.ResourceReservation.Resources.Requests)
+
+	for rName, rQuant := range rl {
+		switch rName {
+		case v1.ResourceCPU:
+			if r.MilliCPU < rQuant.MilliValue() {
+				r.MilliCPU = rQuant.MilliValue()
+			}
+		case v1.ResourceMemory:
+			if r.Memory < rQuant.Value() {
+				r.Memory = rQuant.Value()
+			}
+		default:
+			glog.Errorf("resource reservation for %v is not supported.", rName)
+			continue
+		}
+	}
+}
+
+func (rr *ResourceReservation) removePod(pod *v1.Pod) {
+	r := rr.reservedResource
+	rl := pod.Spec.ResourceReservation.Resources.Requests
+
+	delete(rr.perPodReservation, pod.Name)
+
+	for rName, rQuant := range rl {
+		switch rName {
+		case v1.ResourceCPU:
+			if r.MilliCPU > rQuant.MilliValue() {
+				glog.Errorf("resource reservation corrupted: %v %v", rr, pod)
+			}
+			if r.MilliCPU == rQuant.MilliValue() {
+				var max int64
+				max = 0
+				for _, v := range rr.perPodReservation {
+					if v.MilliCPU > max {
+						max = v.MilliCPU
+					}
+				}
+				r.MilliCPU = max
+			}
+		case v1.ResourceMemory:
+			if r.Memory > rQuant.Value() {
+				glog.Errorf("resource reservation corrupted: %v %v", rr, pod)
+			}
+			if r.Memory == rQuant.Value() {
+				var max int64
+				max = 0
+				for _, v := range rr.perPodReservation {
+					if v.Memory > max {
+						max = v.Memory
+					}
+				}
+				r.Memory = max
+			}
+		default:
+			glog.Errorf("resource reservation for %v is not supported.", rName)
+			continue
+		}
+	}
+}
+
+func (rr *ResourceReservation) String() string {
+	result := fmt.Sprintf("usedResource: %#v", rr.usedResource)
+	result = fmt.Sprintf("%s reservedResource: %#v", result, rr.reservedResource)
+	for n, v := range rr.perPodReservation {
+		result = fmt.Sprintf("%s [%v %#v]", result, n, v)
+	}
+
+	return result
+}
+
+func (rr *ResourceReservation) Clone() *ResourceReservation {
+	result := &ResourceReservation{
+		usedResource:      rr.usedResource.Clone(),
+		reservedResource:  rr.reservedResource.Clone(),
+		perPodReservation: make(map[string]*Resource),
+	}
+	for k, v := range rr.perPodReservation {
+		result.perPodReservation[k] = v.Clone()
+	}
+
+	return result
 }
 
 // Resource is a collection of compute resource.
@@ -106,6 +230,16 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			}
 		}
 	}
+}
+
+// only for reservation
+func (r *Resource) AddResource(x *Resource) {
+	r.MilliCPU += x.MilliCPU
+	r.Memory += x.Memory
+}
+func (r *Resource) RemoveResource(x *Resource) {
+	r.MilliCPU -= x.MilliCPU
+	r.Memory -= x.Memory
 }
 
 func (r *Resource) ResourceList() v1.ResourceList {
@@ -160,11 +294,13 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		requestedResource:   &Resource{},
-		nonzeroRequest:      &Resource{},
-		allocatableResource: &Resource{},
-		generation:          0,
-		usedPorts:           make(util.HostPortInfo),
+		requestedResource:    &Resource{},
+		nonzeroRequest:       &Resource{},
+		allocatableResource:  &Resource{},
+		generation:           0,
+		usedPorts:            make(util.HostPortInfo),
+		reservedResource:     &Resource{},
+		resourceReservations: make(ResourceReservationList),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -260,6 +396,17 @@ func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
 }
 
+func (n *NodeInfo) ReservedResource() Resource {
+	if n == nil {
+		return emptyResource
+	}
+	return *n.reservedResource
+}
+
+func (n *NodeInfo) ResourceReservation(name string) *ResourceReservation {
+	return n.resourceReservations[name]
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
@@ -271,6 +418,8 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		diskPressureCondition:   n.diskPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
 		generation:              n.generation,
+		reservedResource:        n.reservedResource.Clone(),
+		resourceReservations:    make(ResourceReservationList),
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
@@ -286,6 +435,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	if len(n.taints) > 0 {
 		clone.taints = append([]v1.Taint(nil), n.taints...)
 	}
+	for k, v := range n.resourceReservations {
+		clone.resourceReservations[k] = v.Clone()
+	}
 	return clone
 }
 
@@ -295,8 +447,12 @@ func (n *NodeInfo) String() string {
 	for i, pod := range n.pods {
 		podKeys[i] = pod.Name
 	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
-		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
+	var reservations string
+	for n, v := range n.resourceReservations {
+		reservations = fmt.Sprintf("%s [%v %v]", reservations, n, v.String())
+	}
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, ReservedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v, reservations:%v}",
+		podKeys, n.requestedResource, n.reservedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource, reservations)
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
@@ -304,11 +460,56 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
 }
 
+func (n *NodeInfo) updateReservation(name string, pod *v1.Pod) (reservation *ResourceReservation) {
+	if _, ok := n.resourceReservations[name]; ok {
+		reservation = n.resourceReservations[name]
+		n.reservedResource.RemoveResource(reservation.reservedResource)
+	} else {
+		reservation = NewResourceReservation()
+		n.resourceReservations[name] = reservation
+	}
+
+	reservation.addPod(pod)
+	n.reservedResource.AddResource(reservation.reservedResource)
+
+	return reservation
+}
+
+func (n *NodeInfo) removeReservation(name string, pod *v1.Pod) *ResourceReservation {
+	if reservation, ok := n.resourceReservations[name]; ok {
+		if len(reservation.perPodReservation) == 1 {
+			delete(n.resourceReservations, name)
+			n.reservedResource.RemoveResource(reservation.reservedResource)
+			return nil
+		}
+		reservation.removePod(pod)
+		return reservation
+	} else {
+		glog.Errorf("reservation(%v) is not found.", name)
+		return nil
+	}
+}
+
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
+	var reservation *ResourceReservation
+
+	reservation_name, reservedcpu, reservedmem := hasResourceReservation(pod)
+	if reservedcpu || reservedmem {
+		reservation = n.updateReservation(reservation_name, pod)
+	}
+
 	res, non0_cpu, non0_mem := calculateResource(pod)
-	n.requestedResource.MilliCPU += res.MilliCPU
-	n.requestedResource.Memory += res.Memory
+	if reservedcpu {
+		reservation.usedResource.MilliCPU += res.MilliCPU
+	} else {
+		n.requestedResource.MilliCPU += res.MilliCPU
+	}
+	if reservedmem {
+		reservation.usedResource.Memory += res.Memory
+	} else {
+		n.requestedResource.Memory += res.Memory
+	}
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
 	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
@@ -361,10 +562,29 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.pods[i] = n.pods[len(n.pods)-1]
 			n.pods = n.pods[:len(n.pods)-1]
 			// reduce the resource data
+
+			var reservation *ResourceReservation
+			reservation_name, reservedcpu, reservedmem := hasResourceReservation(pod)
+			if reservedcpu || reservedmem {
+				reservation = n.removeReservation(reservation_name, pod)
+			}
+
 			res, non0_cpu, non0_mem := calculateResource(pod)
 
-			n.requestedResource.MilliCPU -= res.MilliCPU
-			n.requestedResource.Memory -= res.Memory
+			if reservedcpu {
+				if reservation != nil {
+					reservation.usedResource.MilliCPU -= res.MilliCPU
+				}
+			} else {
+				n.requestedResource.MilliCPU -= res.MilliCPU
+			}
+			if reservedmem {
+				if reservation != nil {
+					reservation.usedResource.Memory += res.Memory
+				}
+			} else {
+				n.requestedResource.Memory -= res.Memory
+			}
 			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
 			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
 				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -395,6 +615,25 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 		non0_cpu += non0_cpu_req
 		non0_mem += non0_mem_req
 		// No non-zero resources for GPUs or opaque resources.
+	}
+
+	return
+}
+
+func hasResourceReservation(pod *v1.Pod) (name string, cpu bool, mem bool) {
+	name = pod.Spec.ResourceReservation.Name
+	cpu = false
+	mem = false
+
+	if name == "None" {
+		return
+	} else {
+		if _, ok := pod.Spec.ResourceReservation.Resources.Requests[v1.ResourceCPU]; ok {
+			cpu = true
+		}
+		if _, ok := pod.Spec.ResourceReservation.Resources.Requests[v1.ResourceMemory]; ok {
+			mem = true
+		}
 	}
 
 	return

@@ -2915,8 +2915,9 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
-	DNSConfig     *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
-	ResizeRequest ResizeRequest `json:"resizeRequest,omitempty" protobuf:"bytes,27,opt,name=resizeRequest"`
+	DNSConfig           *PodDNSConfig       `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
+	ResizeRequest       ResizeRequest       `json:"resizeRequest,omitempty" protobuf:"bytes,27,opt,name=resizeRequest"`
+	ResourceReservation ResourceReservation `json:"resourceReservation,omitempty" protobuf:"bytes,28,opt,name=resourceReservation"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -4074,6 +4075,11 @@ const (
 	ResizeActionLiveResize          ResizeAction = "LiveResize"
 	ResizeActionLiveResizePreferred ResizeAction = "LiveResizePreferred"
 )
+
+type ResourceReservation struct {
+	Name      string               `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+}
 
 // +genclient
 // +genclient:nonNamespaced

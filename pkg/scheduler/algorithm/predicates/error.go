@@ -57,6 +57,37 @@ var (
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")
 )
 
+type InsufficientReservationError struct {
+	ResourceName v1.ResourceName
+	name         string
+	requested    int64
+	used         int64
+	capacity     int64
+}
+
+func NewInsufficientReservationError(resourceName v1.ResourceName, reservationName string, requested, used, capacity int64) *InsufficientReservationError {
+	return &InsufficientReservationError{
+		ResourceName: resourceName,
+		name:         reservationName,
+		requested:    requested,
+		used:         used,
+		capacity:     capacity,
+	}
+}
+
+func (e *InsufficientReservationError) Error() string {
+	return fmt.Sprintf("Reservation(%s) didn't have enough resource: %s, requested: %d, used: %d, capacity: %d",
+		e.name, e.ResourceName, e.requested, e.used, e.capacity)
+}
+
+func (e *InsufficientReservationError) GetReason() string {
+	return fmt.Sprintf("Insufficient %v", e.ResourceName)
+}
+
+func (e *InsufficientReservationError) GetInsufficientAmount() int64 {
+	return e.requested - (e.capacity - e.used)
+}
+
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
 // hit and caused the unfitting failure.
 type InsufficientResourceError struct {
