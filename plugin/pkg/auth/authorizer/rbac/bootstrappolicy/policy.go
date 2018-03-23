@@ -136,6 +136,7 @@ func NodeRules() []rbac.PolicyRule {
 		// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+		rbac.NewRule("create").Groups(legacyGroup).Resources("pods/resizing", "resizings").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {

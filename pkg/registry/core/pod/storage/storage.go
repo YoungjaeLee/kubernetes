@@ -167,7 +167,7 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 		if pod.DeletionTimestamp != nil {
 			return nil, fmt.Errorf("pod %s is being deleted, cannot be resized.", pod.Name)
 		}
-		if pod.Spec.ResizeRequest.RequestStatus != api.ResizeRequested && pod.Spec.ResizeRequest.RequestStatus != api.ResizeRejected {
+		if pod.Spec.ResizeRequest.RequestStatus != api.ResizeRequested && pod.Spec.ResizeRequest.RequestStatus != api.ResizeRejected && pod.Spec.ResizeRequest.RequestStatus != api.ResizeAccepted {
 			return nil, fmt.Errorf("pod %s is not being requested to be resized (%v).", pod.Name, pod.Spec.ResizeRequest.RequestStatus)
 		}
 
@@ -187,6 +187,8 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 			} else {
 				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
 			}
+		} else if request.RequestStatus == api.ResizeDone {
+			pod.Spec.ResizeRequest.RequestStatus = api.ResizeDone
 		} else {
 			return nil, fmt.Errorf("The RequestStatus is not %v. Something has been critically wrong.", api.ResizeAccepted)
 		}

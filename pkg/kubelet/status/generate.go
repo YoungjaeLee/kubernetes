@@ -157,6 +157,8 @@ func GeneratePodResizedCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus
 		}
 	} else if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 		conditionStatus = v1.ConditionRejected
+	} else if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeDone {
+		conditionStatus = v1.ConditionDone
 	}
 
 	// To leverage the existing UpdatePodCondition, update the PodCondition of PodResized with it, then get it with GetPodCondition, and append it into the s.Conditions.

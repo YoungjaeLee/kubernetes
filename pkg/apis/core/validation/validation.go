@@ -3549,7 +3549,7 @@ func ValidatePodResizing(resizing *core.Resizing) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("RequestStatus"), "empty result"))
 	}
 
-	if resizing.Request.RequestStatus != core.ResizeAccepted && resizing.Request.RequestStatus != core.ResizeRejected {
+	if resizing.Request.RequestStatus != core.ResizeAccepted && resizing.Request.RequestStatus != core.ResizeRejected && resizing.Request.RequestStatus != core.ResizeDone {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("RequestStatus"), resizing.Request.RequestStatus, fmt.Sprintf("invalid value for RequestStatus.")))
 	}
 

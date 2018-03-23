@@ -110,6 +110,8 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 			return c.admitPodStatus(nodeName, a)
 		case "eviction":
 			return c.admitPodEviction(nodeName, a)
+		case "resizing":
+			return c.admitResizing(nodeName, a)
 		default:
 			return admission.NewForbidden(a, fmt.Errorf("unexpected pod subresource %q", a.GetSubresource()))
 		}
@@ -251,6 +253,11 @@ func (c *nodePlugin) admitPodEviction(nodeName string, a admission.Attributes) e
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %s", a.GetOperation()))
 	}
+}
+
+// TODO
+func (c *nodePlugin) admitResizing(nodeName string, a admission.Attributes) error {
+	return nil
 }
 
 func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) error {

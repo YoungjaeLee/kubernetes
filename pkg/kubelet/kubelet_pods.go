@@ -1371,6 +1371,25 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 				s.PodIP = hostIP.String()
 			}
 		}
+
+		if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+			for _, condition := range s.Conditions {
+				if condition.Type == v1.PodResized {
+					if condition.Status == v1.ConditionDone {
+						spec.ResizeRequest.RequestStatus = v1.ResizeDone
+						resizing := &v1.Resizing{
+							ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+							Request:    spec.ResizeRequest,
+						}
+
+						_, err := kl.kubeClient.CoreV1().Pods(resizing.Namespace).Resize(resizing)
+						if err != nil {
+							glog.Info("resizing err: %v", err)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return *s

@@ -4057,6 +4057,7 @@ const (
 	ResizeRequested ResizeStatus = "Requested"
 	ResizeAccepted  ResizeStatus = "Accepted"
 	ResizeRejected  ResizeStatus = "Rejected"
+	ResizeDone      ResizeStatus = "Done"
 	ResizeNone      ResizeStatus = "None"
 )
 
