@@ -744,7 +744,17 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	if podReservationResource.cpu {
 		if reservation != nil {
 			if reservedResource.MilliCPU < podRequest.MilliCPU+usedResource.MilliCPU {
-				predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceCPU, podReservationResource.name, podRequest.MilliCPU, usedResource.MilliCPU, reservedResource.MilliCPU))
+				if reservedResource.MilliCPU >= podReservationResource.Request.MilliCPU {
+					predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceCPU, podReservationResource.name, podRequest.MilliCPU, usedResource.MilliCPU, reservedResource.MilliCPU))
+				} else {
+					if allocatable.MilliCPU < podReservationResource.Request.MilliCPU+nodeInfo.RequestedResource().MilliCPU+nodeInfo.ReservedResource().MilliCPU-reservedResource.MilliCPU {
+						predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceCPU, podReservationResource.name, podRequest.MilliCPU, usedResource.MilliCPU, reservedResource.MilliCPU))
+					} else {
+						if podReservationResource.Request.MilliCPU < podRequest.MilliCPU+usedResource.MilliCPU {
+							predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceCPU, podReservationResource.name, podRequest.MilliCPU, usedResource.MilliCPU, reservedResource.MilliCPU))
+						}
+					}
+				}
 			}
 		} else {
 			if allocatable.MilliCPU < podReservationResource.Request.MilliCPU+nodeInfo.RequestedResource().MilliCPU+nodeInfo.ReservedResource().MilliCPU {
@@ -763,7 +773,17 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	if podReservationResource.mem {
 		if reservation != nil {
 			if reservedResource.Memory < podRequest.Memory+usedResource.Memory {
-				predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceMemory, podReservationResource.name, podRequest.Memory, usedResource.Memory, reservedResource.Memory))
+				if reservedResource.Memory >= podReservationResource.Request.Memory {
+					predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceMemory, podReservationResource.name, podRequest.Memory, usedResource.Memory, reservedResource.Memory))
+				} else {
+					if allocatable.Memory < podReservationResource.Request.Memory+nodeInfo.RequestedResource().Memory+nodeInfo.ReservedResource().Memory-reservedResource.Memory {
+						predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceMemory, podReservationResource.name, podRequest.Memory, usedResource.Memory, reservedResource.Memory))
+					} else {
+						if podReservationResource.Request.Memory < podRequest.Memory+usedResource.Memory {
+							predicateFails = append(predicateFails, NewInsufficientReservationError(v1.ResourceCPU, podReservationResource.name, podRequest.Memory, usedResource.Memory, reservedResource.Memory))
+						}
+					}
+				}
 			}
 		} else {
 			if allocatable.Memory < podReservationResource.Request.Memory+nodeInfo.RequestedResource().Memory+nodeInfo.ReservedResource().Memory {

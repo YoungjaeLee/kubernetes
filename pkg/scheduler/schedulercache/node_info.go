@@ -129,7 +129,7 @@ func (rr *ResourceReservation) removePod(pod *v1.Pod) {
 	for rName, rQuant := range rl {
 		switch rName {
 		case v1.ResourceCPU:
-			if r.MilliCPU > rQuant.MilliValue() {
+			if r.MilliCPU < rQuant.MilliValue() {
 				glog.Errorf("resource reservation corrupted: %v %v", rr, pod)
 			}
 			if r.MilliCPU == rQuant.MilliValue() {
@@ -143,7 +143,7 @@ func (rr *ResourceReservation) removePod(pod *v1.Pod) {
 				r.MilliCPU = max
 			}
 		case v1.ResourceMemory:
-			if r.Memory > rQuant.Value() {
+			if r.Memory < rQuant.Value() {
 				glog.Errorf("resource reservation corrupted: %v %v", rr, pod)
 			}
 			if r.Memory == rQuant.Value() {
