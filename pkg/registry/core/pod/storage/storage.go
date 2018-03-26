@@ -173,10 +173,10 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 
 		if request.RequestStatus == api.ResizeAccepted {
 			if reflect.DeepEqual(pod.Spec.ResizeRequest.NewResources, request.NewResources) {
-				for idx, resources := range request.NewResources {
-					pod.Spec.Containers[idx].Resources = resources
-				}
-				pod.Spec.ResizeRequest = api.ResizeRequest{}
+				//for idx, resources := range request.NewResources {
+				//pod.Spec.Containers[idx].Resources = resources
+				//}
+				//pod.Spec.ResizeRequest = api.ResizeRequest{}
 				pod.Spec.ResizeRequest.RequestStatus = api.ResizeAccepted
 			} else {
 				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
@@ -188,7 +188,15 @@ func (r *ResizingREST) setPodResizingResult(ctx genericapirequest.Context, podID
 				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
 			}
 		} else if request.RequestStatus == api.ResizeDone {
-			pod.Spec.ResizeRequest.RequestStatus = api.ResizeDone
+			if reflect.DeepEqual(pod.Spec.ResizeRequest.NewResources, request.NewResources) {
+				for idx, resources := range request.NewResources {
+					pod.Spec.Containers[idx].Resources = resources
+				}
+				pod.Spec.ResizeRequest = api.ResizeRequest{}
+				pod.Spec.ResizeRequest.RequestStatus = api.ResizeDone
+			} else {
+				return nil, fmt.Errorf("A new resize request has been issued. So, ignore this request(%v).", request)
+			}
 		} else {
 			return nil, fmt.Errorf("The RequestStatus is not %v. Something has been critically wrong.", api.ResizeAccepted)
 		}

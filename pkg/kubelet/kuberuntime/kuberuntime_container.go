@@ -240,14 +240,27 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	return config, nil
 }
 
+//func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v1.Container, pod *v1.Pod) runtimeapi.LinuxContainerResources {
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v1.Container, pod *v1.Pod) runtimeapi.LinuxContainerResources {
 	var r runtimeapi.LinuxContainerResources
+	var Resources v1.ResourceRequirements
+
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+		for idx, v := range pod.Spec.ResizeRequest.NewResources {
+			if pod.Spec.Containers[idx].Name == container.Name {
+				Resources = v
+				break
+			}
+		}
+	} else {
+		Resources = container.Resources
+	}
 
 	// set linux container resources
 	var cpuShares int64
-	cpuRequest := container.Resources.Requests.Cpu()
-	cpuLimit := container.Resources.Limits.Cpu()
-	memoryLimit := container.Resources.Limits.Memory().Value()
+	cpuRequest := Resources.Requests.Cpu()
+	cpuLimit := Resources.Limits.Cpu()
+	memoryLimit := Resources.Limits.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
@@ -277,7 +290,44 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v
 	}
 
 	return r
+	/*
+		var r runtimeapi.LinuxContainerResources
 
+		// set linux container resources
+		var cpuShares int64
+		cpuRequest := container.Resources.Requests.Cpu()
+		cpuLimit := container.Resources.Limits.Cpu()
+		memoryLimit := container.Resources.Limits.Memory().Value()
+		oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
+			int64(m.machineInfo.MemoryCapacity)))
+		// If request is not specified, but limit is, we want request to default to limit.
+		// API server does this for new containers, but we repeat this logic in Kubelet
+		// for containers running on existing Kubernetes clusters.
+		if cpuRequest.IsZero() && !cpuLimit.IsZero() {
+			cpuShares = milliCPUToShares(cpuLimit.MilliValue())
+		} else {
+			// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
+			// of CPU shares.
+			cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+		}
+		r.CpuShares = cpuShares
+		if memoryLimit != 0 {
+			r.MemoryLimitInBytes = memoryLimit
+		}
+		// Set OOM score of the container based on qos policy. Processes in lower-priority pods should
+		// be killed first if the system runs out of memory.
+		r.OomScoreAdj = oomScoreAdj
+
+		if m.cpuCFSQuota {
+			// if cpuLimit.Amount is nil, then the appropriate default value is returned
+			// to allow full usage of cpu resource.
+			cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
+			r.CpuQuota = cpuQuota
+			r.CpuPeriod = cpuPeriod
+		}
+
+		return r
+	*/
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
