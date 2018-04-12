@@ -4043,9 +4043,10 @@ type ResourceList map[ResourceName]resource.Quantity
 type ResizePolicyName string
 
 const (
-	ResizeDisabled       ResizePolicyName = "Disabled"
-	ResizeRestartOnly    ResizePolicyName = "RestartOnly"
-	ResizeLiveResizeable ResizePolicyName = "LiveResizeable"
+	ResizeDisabled         ResizePolicyName = "Disabled"
+	ResizeRestartOnly      ResizePolicyName = "RestartOnly"
+	ResizeContainerRestart ResizePolicyName = "ContainerRestart"
+	ResizeLiveResizeable   ResizePolicyName = "LiveResizeable"
 )
 
 // ResizePolicyList is a set of (resource name, resize policy) pairs

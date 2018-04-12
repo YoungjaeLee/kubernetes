@@ -18,6 +18,7 @@ package v1
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -117,6 +118,23 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
+	}
+
+	for i := range obj.Spec.Template.Spec.Containers {
+		if obj.Spec.Template.Spec.Containers[i].Resources.Limits != nil {
+			for key := range obj.Spec.Template.Spec.Containers[i].Resources.Limits {
+				if obj.Spec.Template.Spec.Containers[i].Resources.ResizePolicy[key] == "" {
+					obj.Spec.Template.Spec.Containers[i].Resources.ResizePolicy[key] = v1.ResizeRestartOnly
+				}
+			}
+		}
+		if obj.Spec.Template.Spec.Containers[i].Resources.Requests != nil {
+			for key := range obj.Spec.Template.Spec.Containers[i].Resources.Requests {
+				if obj.Spec.Template.Spec.Containers[i].Resources.ResizePolicy[key] == "" {
+					obj.Spec.Template.Spec.Containers[i].Resources.ResizePolicy[key] = v1.ResizeRestartOnly
+				}
+			}
+		}
 	}
 }
 func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {

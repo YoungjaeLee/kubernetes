@@ -3342,7 +3342,7 @@ func ValidateContainerResourceUpdates(newContainers, oldContainers []core.Contai
 		for resourceName, _ := range helper.GetStandardContainerResources() {
 			apiResourceName := core.ResourceName(resourceName)
 			if isResourceReqChanged(oldCtr.Resources, newContainers[i].Resources, apiResourceName) {
-				if oldCtr.Resources.ResizePolicy[apiResourceName] == core.ResizeDisabled {
+				if oldCtr.Resources.ResizePolicy[apiResourceName] == core.ResizeDisabled || oldCtr.Resources.ResizePolicy[apiResourceName] == core.ResizeRestartOnly {
 					msg := fmt.Sprintf("The resizing of %s is disabled.", resourceName)
 					allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources"), msg))
 					invalid = true

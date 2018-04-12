@@ -36,6 +36,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
+	policyPath := fldPath.Child("resizePolicy")
 	for resourceName, quantity := range requirements.Limits {
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
@@ -63,6 +64,16 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 			}
 		} else if resourceName == v1.ResourceNvidiaGPU {
 			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", v1.ResourceNvidiaGPU)))
+		}
+	}
+	for resourceName, policy := range requirements.ResizePolicy {
+		fldPath := policyPath.Key(string(resourceName))
+		if resourceName != v1.ResourceCPU && resourceName != v1.ResourceMemory {
+			allErrs = append(allErrs, field.Invalid(fldPath, string(resourceName), "must be cpu or memory"))
+		} else {
+			if policy != v1.ResizeDisabled && policy != v1.ResizeRestartOnly && policy != v1.ResizeContainerRestart && policy != v1.ResizeLiveResizeable {
+				allErrs = append(allErrs, field.Invalid(fldPath, string(policy), "is invalid policy"))
+			}
 		}
 	}
 

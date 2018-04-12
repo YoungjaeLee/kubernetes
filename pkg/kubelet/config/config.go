@@ -274,10 +274,13 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
 			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
+			glog.Infof("Adding new pods from source %s : %v", source, update.Pods)
 		} else if update.Op == kubetypes.DELETE {
 			glog.V(4).Infof("Graceful deleting pods from source %s : %v", source, update.Pods)
+			glog.Infof("Graceful deleting pods from source %s : %v", source, update.Pods)
 		} else {
 			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
+			glog.Infof("Updating pods from source %s : %v", source, update.Pods)
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
@@ -295,6 +298,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 	case kubetypes.SET:
 		glog.V(4).Infof("Setting pods for source %s", source)
+		glog.Infof("Setting pods for source %s", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
@@ -440,15 +444,30 @@ func podsDifferSemantically(existing, ref *v1.Pod) bool {
 //   Now, needUpdate, needGracefulDelete and needReconcile should never be both true
 func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGracefulDelete bool) {
 
-	// 0. Check if the pod is being under resource resizing
-	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
-		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
-	}
-	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
-		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
-	}
-	if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
-		glog.Infof("The pod(%s) under resource-resizing checked.", ref.Name)
+	info := func() {
+		ck := 0
+		// Check if the pod is being under resource resizing
+		if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested {
+			glog.Infof("The pod(%s) under resource-resizing checked.(Requested)", ref.Name)
+			ck = 1
+		}
+		if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+			glog.Infof("The pod(%s) under resource-resizing checked.(Accepted)", ref.Name)
+			ck = 1
+		}
+		if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+			glog.Infof("The pod(%s) under resource-resizing checked.(Rejected)", ref.Name)
+			ck = 1
+		}
+		if ref.Spec.ResizeRequest.RequestStatus == v1.ResizeDone {
+			glog.Infof("The pod(%s) under resource-resizing checked.(Done)", ref.Name)
+			ck = 1
+		}
+		if ck == 1 {
+			glog.Infof("needUpdate: %v, needReconcile: %v, needGracefulDelete: %v", needUpdate, needReconcile, needGracefulDelete)
+			glog.Infof("ref: %v", ref.Spec.Containers[0].Resources.Requests)
+			glog.Infof("ref: %v", ref.Spec.ResizeRequest)
+		}
 	}
 
 	// 1. this is a reconcile
@@ -464,6 +483,7 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 			existing.Status = ref.Status
 			needReconcile = true
 		}
+		info()
 		return
 	}
 	// Kubelet shouldn't care about the changes on ResizeRequest
@@ -489,6 +509,7 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 		needUpdate = true
 	}
 
+	info()
 	return
 }
 

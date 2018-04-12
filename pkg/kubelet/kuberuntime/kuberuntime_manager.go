@@ -444,7 +444,7 @@ func (m *kubeGenericRuntimeManager) containerChanged(container *v1.Container, co
 			newLC := m.generateLinuxContainerResources(container, pod)
 			if changed, restartNeeded := containerStatus.Resources.ComputeResourceChanges(newLC); len(changed) > 0 {
 				for resource, _ := range changed {
-					if container.Resources.ResizePolicy[resource] == v1.ResizeRestartOnly {
+					if container.Resources.ResizePolicy[resource] != v1.ResizeLiveResizeable {
 						needToRestart = true
 					}
 					if restartNeeded[resource] {
@@ -454,6 +454,7 @@ func (m *kubeGenericRuntimeManager) containerChanged(container *v1.Container, co
 					}
 				}
 				if needToRestart == false {
+					glog.Infof("%v is changed: %v", changed, newLC)
 					liveResizable = true
 				}
 			}
@@ -640,6 +641,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  5. Create init containers.
 //  6. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+	glog.Infof("SyncPod: %v, %v", pod.Spec.Containers[0].Resources.Requests, pod.Spec.ResizeRequest.RequestStatus)
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
 	glog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
@@ -813,7 +815,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 
 	// If the total amount of CpuQuota allocated to containers increases by resizing,
 	// the CpuQuata at pod-level should be updated before updating container-level CpuQuota.
-	if len(podContainerChanges.ContainersToResize) > 0 || len(podContainerChanges.ContainersToResize) > 0 {
+	if len(podContainerChanges.ContainersToResize) > 0 || len(podContainerChanges.ContainersToRestart) > 0 {
 		updatePodResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, format.Pod(pod))
 		currentPodCpuQuota := int64(0)
 		newPodCpuQuota := int64(0)
@@ -867,6 +869,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		updateContainerResult := kubecontainer.NewSyncResult(kubecontainer.UpdateContainer, container.Name)
 		result.AddSyncResult(updateContainerResult)
 
+		glog.Infof("Resizing container %v in pod %v, %v", pod.Spec.Containers[0].Resources.Requests, format.Pod(pod), pod.Spec.ResizeRequest.RequestStatus)
 		if msg, err := m.updateContainer(containerId, container, pod); err != nil {
 			updateContainerResult.Fail(err, msg)
 		} else {

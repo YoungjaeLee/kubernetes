@@ -1424,6 +1424,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	podStatus := o.podStatus
 	updateType := o.updateType
 
+	glog.Infof("syncPod: %v, %v", pod.Spec.Containers[0].Resources.Requests, pod.Spec.ResizeRequest.RequestStatus)
+
 	// if we want to kill a pod, do it now!
 	if updateType == kubetypes.SyncPodKill {
 		killPodOptions := o.killPodOptions
@@ -1845,12 +1847,14 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
 			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletiontimestamps(u.Pods))
+			glog.Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletiontimestamps(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodRemoves(u.Pods)
 		case kubetypes.RECONCILE:
 			glog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
+			glog.Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodReconcile(u.Pods)
 		case kubetypes.DELETE:
 			glog.V(2).Infof("SyncLoop (DELETE, %q): %q", u.Source, format.Pods(u.Pods))

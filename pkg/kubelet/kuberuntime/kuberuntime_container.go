@@ -241,11 +241,14 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 }
 
 //func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v1.Container, pod *v1.Pod) runtimeapi.LinuxContainerResources {
+// Returns LinuxContainerResources allocated (and admiited by schedule) to the container.
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v1.Container, pod *v1.Pod) runtimeapi.LinuxContainerResources {
 	var r runtimeapi.LinuxContainerResources
 	var Resources v1.ResourceRequirements
 
 	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+		// There is a resizing requested that has issued, then accpeted by scheduler.
+		// So, should use the ResourceRequirement of ResizeRequest.NewResources, instead of that of the container's spec
 		for idx, v := range pod.Spec.ResizeRequest.NewResources {
 			if pod.Spec.Containers[idx].Name == container.Name {
 				Resources = v
@@ -332,16 +335,31 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(container *v
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
 func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.LinuxContainerConfig {
+	var Resources v1.ResourceRequirements
+
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
 	}
 
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+		// There is a resizing requested that has issued, then accpeted by scheduler.
+		// So, should use the ResourceRequirement of ResizeRequest.NewResources, instead of that of the container's spec
+		for idx, v := range pod.Spec.ResizeRequest.NewResources {
+			if pod.Spec.Containers[idx].Name == container.Name {
+				Resources = v
+				break
+			}
+		}
+	} else {
+		Resources = container.Resources
+	}
+
 	// set linux container resources
 	var cpuShares int64
-	cpuRequest := container.Resources.Requests.Cpu()
-	cpuLimit := container.Resources.Limits.Cpu()
-	memoryLimit := container.Resources.Limits.Memory().Value()
+	cpuRequest := Resources.Requests.Cpu()
+	cpuLimit := Resources.Limits.Cpu()
+	memoryLimit := Resources.Limits.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
