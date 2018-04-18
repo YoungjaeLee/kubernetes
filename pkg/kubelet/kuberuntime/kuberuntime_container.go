@@ -180,6 +180,9 @@ func (m *kubeGenericRuntimeManager) updateContainer(containerId kubecontainer.Co
 		m.recordContainerEvent(pod, container, containerId.ID, v1.EventTypeWarning, events.FailedToUpdateContainer, message)
 		return "Update Container Failed", err
 	}
+	if err = m.internalLifecycle.PostResizeContainer(pod, container, containerId.ID); err != nil {
+		return "", err
+	}
 	message := fmt.Sprintf("Updated container with id %v with resources %v", containerId, resources)
 	m.recordContainerEvent(pod, container, containerId.ID, v1.EventTypeNormal, events.UpdatedContainer, message)
 

@@ -30,7 +30,7 @@ func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerStub) Update(_ *v1.Pod) error {
+func (m *podContainerManagerStub) UpdateForResizing(_ *v1.Pod) error {
 	return nil
 }
 

@@ -64,12 +64,12 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	return m.cgroupManager.Exists(podContainerName)
 }
 
-func (m *podContainerManagerImpl) Update(pod *v1.Pod) error {
+func (m *podContainerManagerImpl) UpdateForResizing(pod *v1.Pod) error {
 	podContainerName, _ := m.GetPodContainerName(pod)
 
 	containerConfig := &CgroupConfig{
 		Name:               podContainerName,
-		ResourceParameters: ResourceConfigForPod(pod),
+		ResourceParameters: ResourceConfigForPodForResizing(pod),
 	}
 	if err := m.cgroupManager.Update(containerConfig); err != nil {
 		return fmt.Errorf("failed to update container for %v : %v", podContainerName, err)
@@ -259,7 +259,7 @@ func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerNoop) Update(_ *v1.Pod) error {
+func (m *podContainerManagerNoop) UpdateForResizing(_ *v1.Pod) error {
 	return nil
 }
 

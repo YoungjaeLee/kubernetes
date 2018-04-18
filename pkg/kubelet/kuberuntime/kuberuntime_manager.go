@@ -828,12 +828,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 
 		if newPodCpuQuota > currentPodCpuQuota {
-			if err := m.runtimeHelper.UpdatePodCgroup(pod); err != nil {
+			if err := m.runtimeHelper.UpdatePodCgroupForResizing(pod); err != nil {
 				result.AddSyncResult(updatePodResult)
 				updatePodResult.Fail(err, "Update the pod's cgroup failed")
 				return
 			}
 		}
+		glog.Infof("newPodCpuQuota: %v, currentPodCpuQuota: %v", newPodCpuQuota, currentPodCpuQuota)
 	}
 
 	// Step 7: start containers in podContainerChanges.ContainersToRestart.

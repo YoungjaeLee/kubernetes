@@ -1197,8 +1197,8 @@ func allLocalIPsWithoutLoopback() ([]net.IP, error) {
 	return ips, nil
 }
 
-func (kl *Kubelet) UpdatePodCgroup(pod *v1.Pod) error {
-	return kl.containerManager.NewPodContainerManager().Update(pod)
+func (kl *Kubelet) UpdatePodCgroupForResizing(pod *v1.Pod) error {
+	return kl.containerManager.NewPodContainerManager().UpdateForResizing(pod)
 }
 
 func (kl *Kubelet) UpdatePodStatusCache(pod *v1.Pod) error {
@@ -1623,7 +1623,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	for _, syncResult := range result.SyncResults {
 		if syncResult.Action == kubecontainer.UpdateContainer && syncResult.Error == nil {
 			// The pod might have been resized, so it needs to update its cgroup.
-			if err := pcm.Update(pod); err != nil {
+			if err := pcm.UpdateForResizing(pod); err != nil {
 				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 			}
 			kl.pleg.AddResizingEvent(pod.UID)
@@ -1634,7 +1634,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		//}
 		if syncResult.Action == kubecontainer.RestartContainer && syncResult.Error == nil {
 			// The pod might have been resized, so it needs to update its cgroup.
-			if err := pcm.Update(pod); err != nil {
+			if err := pcm.UpdateForResizing(pod); err != nil {
 				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 			}
 		}

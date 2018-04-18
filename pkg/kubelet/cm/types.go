@@ -112,7 +112,7 @@ type PodContainerManager interface {
 	// Exists returns true if the pod cgroup exists.
 	Exists(*v1.Pod) bool
 
-	Update(*v1.Pod) error
+	UpdateForResizing(*v1.Pod) error
 
 	// Destroy takes a pod Cgroup name as argument and destroys the pod's container.
 	Destroy(name CgroupName) error

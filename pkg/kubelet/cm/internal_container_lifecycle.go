@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -28,6 +29,7 @@ type InternalContainerLifecycle interface {
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
 	PreStopContainer(containerID string) error
 	PostStopContainer(containerID string) error
+	PostResizeContainer(pod *v1.Pod, container *v1.Container, containerID string) error
 }
 
 // Implements InternalContainerLifecycle interface.
@@ -52,6 +54,32 @@ func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) er
 func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		return i.cpuManager.RemoveContainer(containerID)
+	}
+	return nil
+}
+
+func (i *internalContainerLifecycleImpl) PostResizeContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		err := i.cpuManager.RemoveContainer(containerID)
+		if err != nil {
+			return err
+		}
+		resizedPod := pod.DeepCopy()
+		resizedContainer := container.DeepCopy()
+
+		if resizedPod.Spec.ResizeRequest.RequestStatus == v1.ResizeAccepted {
+			for idx, v := range resizedPod.Spec.ResizeRequest.NewResources {
+				if resizedPod.Spec.Containers[idx].Name == container.Name {
+					resizedPod.Spec.Containers[idx].Resources = v
+					resizedContainer.Resources = v
+					break
+				}
+			}
+		} else {
+			return fmt.Errorf("[cpumanager] PostResizeContainer called for a pod that is not in ResizeAccepted state")
+		}
+
+		return i.cpuManager.AddContainer(resizedPod, resizedContainer, containerID)
 	}
 	return nil
 }
