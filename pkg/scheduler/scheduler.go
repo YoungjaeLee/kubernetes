@@ -560,17 +560,18 @@ func (sched *Scheduler) scheduleOne() {
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		return
 	}
-//	tryResize := 0
-//	preemptToResizeOnce := false
-//	for (tryResize < 1 || preemptToResizeOnce) && (pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested ||
-//		pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected) { // Goes through resize path again if preemptToResize was exercised once
-	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested || pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+	tryResize := 0
+	preemptToResizeOnce := false
+	for (tryResize < 1 || preemptToResizeOnce) && (pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested ||
+		pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected) { // Goes through resize path again if preemptToResize was exercised once
+	// if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested || pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 		var resizedPod *v1.Pod
 
 		glog.V(3).Infof("Attempting to resize pod: %v/%v", pod.Namespace, pod.Name)
+		glog.Infof("Attempting to resize pod: %v/%v", pod.Namespace, pod.Name)
 		err := sched.resize(pod)
 		resizedPod = nil
-	//	tryResize++
+		tryResize++
 
 		if err != nil  { // pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected - set in sched.resize
 
@@ -585,13 +586,15 @@ func (sched *Scheduler) scheduleOne() {
 			} else {
 				glog.Infof("node stats for %v after preemptToResize: %v", pod.Spec.NodeName, n.String())
 			}
-			// preemptToResizeOnce = true
+
 			if perr == nil {
-			//	continue // Go through sched.resize again to see if the preemption helped to avoid race condition with preempted pod being rescheduled before the resize
-				glog.Infof("preemptToResize succeeded on node %v to resize pod %v/%v (node: %v)", preemptNodeName, pod.Namespace, pod.Name, pod.Spec.NodeName)
+				preemptToResizeOnce = true
+			    glog.Infof("preemptToResize succeeded on node %v to resize pod %v/%v (node: %v)", preemptNodeName, pod.Namespace, pod.Name, pod.Spec.NodeName)
+				continue // Go through sched.resize again to see if the preemption helped to avoid race condition with preempted pod being rescheduled before the resize
 			}
 		} else {
 			resizedPod, err = sched.assumeResizedPod(pod)
+			preemptToResizeOnce = false
 			/** Following glog.Infof introduced for debug - KR **/
 			/** Added for debug - KR **/
 			nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
