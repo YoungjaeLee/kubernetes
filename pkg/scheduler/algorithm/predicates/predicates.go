@@ -717,7 +717,14 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}
 	}
-
+	/** Inserted for Debug by KR **/
+	if len(predicateFails) == 0 {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v (%v MilliCPU, %v Memory) on Node %+v (%v MilliCPU, %v Memory already requested out of allocatable %v MilliCPU, %v Memory) is allowed, Node is running only %v out of %v Pods.", podName(pod), podRequest.MilliCPU, podRequest.Memory, node.Name, nodeInfo.RequestedResource().MilliCPU, nodeInfo.RequestedResource().Memory, allocatable.MilliCPU, allocatable.Memory, len(nodeInfo.Pods()), allowedPodNumber)
+	} else {
+		glog.Infof("CANNOT Schedule Pod %+v (%v MilliCPU, %v Memory) on Node %+v (%v MilliCPU, %v Memory already requested out of allocatable %v MilliCPU, %v Memory) is allowed, Node is running only %v out of %v Pods.", podName(pod), podRequest.MilliCPU, podRequest.Memory, node.Name, nodeInfo.RequestedResource().MilliCPU, nodeInfo.RequestedResource().Memory, allocatable.MilliCPU, allocatable.Memory, len(nodeInfo.Pods()), allowedPodNumber)
+	}
 	if glog.V(10) {
 		if len(predicateFails) == 0 {
 			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is

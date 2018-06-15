@@ -60,4 +60,9 @@ type ScheduleAlgorithm interface {
 	Prioritizers() []PriorityConfig
 
 	Resize(pod *v1.Pod, nodeLister NodeLister) error
+	// PreemptToResize tries to create room for
+	// the pod being resized by preempting lower priority pods if possible.
+	// It returns the node where preemption happened, a list of preempted pods, a
+	// list of pods whose nominated node name should be removed, and error if any.
+	PreemptToResize(*v1.Pod, NodeLister) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 }

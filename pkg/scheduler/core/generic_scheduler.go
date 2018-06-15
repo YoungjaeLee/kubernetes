@@ -119,7 +119,10 @@ func (g *genericScheduler) Resize(pod *v1.Pod, nodeLister algorithm.NodeLister) 
 	nodes[0] = node
 
 	nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
-	err = g.cache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod)
+	/** Added for debug - KR **/
+	glog.Infof("Going to call GetNodeNameToInfoMapforResizing in Resize for pod %v node %v", pod.Name, pod.Spec.NodeName)
+
+	err = g.cache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod, true)
 	if err != nil {
 		return nil
 	}
@@ -134,7 +137,8 @@ func (g *genericScheduler) Resize(pod *v1.Pod, nodeLister algorithm.NodeLister) 
 		oldResources[ctr_idx] = pod.Spec.Containers[ctr_idx].Resources
 		pod.Spec.Containers[ctr_idx].Resources = newResource
 	}
-
+	/** Added for debug - KR **/
+	glog.Infof("Going to call findNodesThatFit in Resize for pod %v node %v", pod.Name, pod.Spec.NodeName)
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue)
 	for ctr_idx, _ := range pod.Spec.ResizeRequest.NewResources {
 		/*
@@ -243,6 +247,95 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 	g.lastNodeIndexLock.Unlock()
 
 	return priorityList[ix].Host, nil
+}
+
+// preempt finds nodes with pods that can be preempted to make room for "pod" to
+// schedule. It chooses one of the nodes and preempts the pods on the node and
+// returns 1) the node, 2) the list of preempted pods if such a node is found,
+// 3) A list of pods whose nominated node name should be cleared, and 4) any
+// possible error.
+func (g *genericScheduler) PreemptToResize(pod *v1.Pod, nodeLister algorithm.NodeLister) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+
+	err := g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
+		glog.V(5).Infof("Pod %v is not eligible for more preemption.", pod.Name)
+		return nil, nil, nil, nil
+	}
+
+	node, err := nodeLister.Get(pod.Spec.NodeName)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	nodes := make([]*v1.Node, 1)
+	nodes[0] = node
+
+	nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
+	err = g.cache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod, true)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	pdbs, err := g.cache.ListPDBs(labels.Everything())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	/** Adjust request sizes for containers in pod to new ones - KR **/
+	oldResources := make(map[int]v1.ResourceRequirements)
+	for ctr_idx, newResource := range pod.Spec.ResizeRequest.NewResources {
+		/*
+			if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+				continue
+			}
+		*/
+		oldResources[ctr_idx] = pod.Spec.Containers[ctr_idx].Resources
+		pod.Spec.Containers[ctr_idx].Resources = newResource
+	}
+
+
+	nodeToVictims, err := selectNodesForPreemption(pod, nodeInfoMap, nodes, g.predicates, g.predicateMetaProducer, g.schedulingQueue, pdbs)
+
+	/** Undo adjustment of request sizes for containers in pod to new ones - KR **/
+	for ctr_idx, _ := range pod.Spec.ResizeRequest.NewResources {
+		/*
+			if !pod.Spec.ResizeRequest.UpdatedCtrs[ctr_idx] {
+				continue
+			}
+		*/
+		pod.Spec.Containers[ctr_idx].Resources = oldResources[ctr_idx]
+	}
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if len(nodeToVictims) == 1 {
+		node := pickOneNodeForPreemption(nodeToVictims)
+
+		if node == nil {
+			return nil, nil, nil, err
+		}
+		passes, pErr := nodePassesExtendersForPreemption(pod, node.Name, nodeToVictims[node].pods, g.cachedNodeInfoMap, g.extenders)
+		if passes && pErr == nil {
+			// Lower priority pods nominated to run on this node, may no longer fit on
+			// this node. So, we should remove their nomination. Removing their
+			// nomination updates these pods and moves them to the active queue. It
+			// lets scheduler find another place for them.
+			nominatedPods := g.getLowerPriorityNominatedPods(pod, node.Name)
+			return node, nodeToVictims[node].pods, nominatedPods, err
+		}
+		if pErr != nil {
+			glog.Errorf("Error occurred while checking extenders for preemption on node %v: %v", node, pErr)
+		}
+		// Remove the node from the map and try to pick a different node.
+		delete(nodeToVictims, node)
+	} else {
+		glog.V(3).Infof("Unable to find space in node %v to resize pod %v", nodes[0].Name, pod.Name)
+	}
+	return nil, nil, nil, err
 }
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
@@ -939,12 +1032,18 @@ func selectVictimsOnNode(
 	nodeInfoCopy := nodeInfo.Clone()
 
 	removePod := func(rp *v1.Pod) {
+		/** Added for debug - KR **/
+		glog.Infof("Going to call removePod inside SelectVictimsOnNode for pod %v", rp.Name)
+
 		nodeInfoCopy.RemovePod(rp)
 		if meta != nil {
 			meta.RemovePod(rp)
 		}
 	}
+
 	addPod := func(ap *v1.Pod) {
+		/** Added for debug - KR **/
+		glog.Infof("Going to call addPod inside SelectVictimsOnNode for pod %v", ap.Name)
 		nodeInfoCopy.AddPod(ap)
 		if meta != nil {
 			meta.AddPod(ap, nodeInfoCopy)

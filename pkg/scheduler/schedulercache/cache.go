@@ -83,7 +83,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
-func (cache *schedulerCache) GetNodeNameToInfoMapforResizing(nodeNameToInfo map[string]*NodeInfo, pod *v1.Pod) error {
+func (cache *schedulerCache) GetNodeNameToInfoMapforResizing(nodeNameToInfo map[string]*NodeInfo, pod *v1.Pod, resize bool) error {
 	var nodeInfo *NodeInfo
 
 	nodeInfo = nil
@@ -99,15 +99,17 @@ func (cache *schedulerCache) GetNodeNameToInfoMapforResizing(nodeNameToInfo map[
 	if nodeInfo == nil {
 		return fmt.Errorf("The node(%v) that the pod is supposed to be running on doesn't exist.", pod.Spec.NodeName)
 	}
-
-	err := nodeInfo.RemovePod(pod)
-	if err != nil {
-		return err
+	if resize == true {
+		err := nodeInfo.RemovePod(pod)
+		if err != nil {
+			return err
+		}
 	}
 	nodeNameToInfo[pod.Spec.NodeName] = nodeInfo
 
 	return nil
 }
+
 
 func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
@@ -164,10 +166,12 @@ func (cache *schedulerCache) ForgetResizedPod(oldPod, newPod *v1.Pod) error {
 	if !ok {
 		return fmt.Errorf("pod state wasn't added, but get forget-resized, Pod key: %v", key)
 	}
-
+	glog.Infof("In ForgetResizedPod before updatePod")
 	if err := cache.updatePod(newPod, oldPod); err != nil {
 		return err
 	}
+	glog.Infof("In ForgetResizedPod after updatePod")
+
 	currState.pod = oldPod
 
 	delete(cache.assumedResizedPods, key)
@@ -191,10 +195,11 @@ func (cache *schedulerCache) AssumeResizedPod(oldPod, newPod *v1.Pod) error {
 	if !ok {
 		return fmt.Errorf("pod state wasn't added, but get resized, Pod key: %v", key)
 	}
-
+	glog.Infof("In AssumeResizedPod, BEFORE CALLING updatePod - reinstated call to updatePod")
 	if err := cache.updatePod(oldPod, newPod); err != nil {
 		return nil
 	}
+
 	currState.pod = newPod
 
 	cache.assumedResizedPods[key] = true
@@ -288,6 +293,12 @@ func (cache *schedulerCache) addPod(pod *v1.Pod) {
 
 // Assumes that lock is already acquired.
 func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
+	/** Added below for debug - KR **/
+	n, ok := cache.nodes[oldPod.Spec.NodeName]
+	if !ok {
+			glog.Infof(" Unable to find node name for pod %v in cache!", oldPod.Name)
+	}
+	glog.Infof("Pod %v: old resources %v to be updated to new sizes %v on node %v (%v)", oldPod.Name, oldPod.Spec.Containers[0].Resources, newPod.Spec.Containers[0].Resources, oldPod.Spec.NodeName, n.String())
 	if err := cache.removePod(oldPod); err != nil {
 		return err
 	}
@@ -343,11 +354,23 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 	return nil
 }
 
+func GetResourceRequest(pod *v1.Pod) *Resource {
+	result := &Resource{}
+	for _, container := range pod.Spec.Containers {
+		result.Add(container.Resources.Requests)
+	}
+
+	return result
+}
+
 func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 	key, err := getPodKey(oldPod)
 	if err != nil {
 		return err
 	}
+
+	var oldPodRequest *Resource /** Introduced for checking for resize **/
+	var newPodRequest *Resource
 
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -361,8 +384,12 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 			glog.Errorf("Pod %v updated on a different node than previously added to.", key)
 			glog.Fatalf("Schedulercache is corrupted and can badly affect scheduling decisions")
 		}
-		if cache.assumedResizedPods[key] {
-			delete(cache.assumedResizedPods, key)
+		newPodRequest = GetResourceRequest(newPod)
+		oldPodRequest = GetResourceRequest(oldPod)
+		if cache.assumedResizedPods[key] && (newPodRequest.MilliCPU != oldPodRequest.MilliCPU ||
+			newPodRequest.Memory != oldPodRequest.Memory) {
+				glog.Infof("UpdatePod called with different sizes for old and new pods, clearing assumedResizedPods key")
+				delete(cache.assumedResizedPods, key)
 		} else {
 			if err := cache.updatePod(oldPod, newPod); err != nil {
 				return err

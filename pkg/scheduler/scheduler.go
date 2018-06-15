@@ -329,6 +329,55 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	return nodeName, err
 }
 
+// preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
+// If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
+// It returns the node name and an error if any.
+func (sched *Scheduler) preemptToResize(preemptor *v1.Pod) (string, error) {
+	if !util.PodPriorityEnabled() {
+		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")
+		return "", nil
+	}
+	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
+	if err != nil {
+		glog.Errorf("Error getting the updated preemptor pod object: %v", err)
+		return "", err
+	}
+	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.PreemptToResize(preemptor, sched.config.NodeLister)
+	if err != nil {
+		glog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
+		return "", err
+	}
+	var nodeName = ""
+	if node != nil {
+		nodeName = node.Name
+		annotations := map[string]string{core.NominatedNodeAnnotationKey: nodeName}
+		err = sched.config.PodPreemptor.UpdatePodAnnotations(preemptor, annotations)
+		if err != nil {
+			glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
+			return "", err
+		}
+		for _, victim := range victims {
+			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
+				glog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+				return "", err
+			}
+			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
+		}
+	}
+	// Clearing nominated pods should happen outside of "if node != nil". Node could
+	// be nil when a pod with nominated node name is eligible to preempt again,
+	// but preemption logic does not find any node for it. In that case Preempt()
+	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
+	for _, p := range nominatedPodsToClear {
+		rErr := sched.config.PodPreemptor.RemoveNominatedNodeAnnotation(p)
+		if rErr != nil {
+			glog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
+			// We do not return as this error is not critical.
+		}
+	}
+	return nodeName, err
+}
+
 // assumeAndBindVolumes will update the volume cache and then asynchronously bind volumes if required.
 //
 // If volume binding is required, then the bind volumes routine will update the pod to send it back through
@@ -511,26 +560,67 @@ func (sched *Scheduler) scheduleOne() {
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		return
 	}
-
-	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested ||
-		pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
+//	tryResize := 0
+//	preemptToResizeOnce := false
+//	for (tryResize < 1 || preemptToResizeOnce) && (pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested ||
+//		pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected) { // Goes through resize path again if preemptToResize was exercised once
+	if pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRequested || pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected {
 		var resizedPod *v1.Pod
 
 		glog.V(3).Infof("Attempting to resize pod: %v/%v", pod.Namespace, pod.Name)
 		err := sched.resize(pod)
 		resizedPod = nil
-		if err == nil {
+	//	tryResize++
+
+		if err != nil  { // pod.Spec.ResizeRequest.RequestStatus == v1.ResizeRejected - set in sched.resize
+
+			preemptNodeName, perr := sched.preemptToResize(pod)
+			/** Following glog.Infof introduced for debug - KR **/
+			nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
+			sched.config.SchedulerCache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod, false)
+			n, ok := nodeInfoMap[pod.Spec.NodeName]
+
+			if !ok {
+				glog.Infof(" Unable to find node in cache for pod %v !", pod.Name)
+			} else {
+				glog.Infof("node stats for %v after preemptToResize: %v", pod.Spec.NodeName, n.String())
+			}
+			// preemptToResizeOnce = true
+			if perr == nil {
+			//	continue // Go through sched.resize again to see if the preemption helped to avoid race condition with preempted pod being rescheduled before the resize
+				glog.Infof("preemptToResize succeeded on node %v to resize pod %v/%v (node: %v)", preemptNodeName, pod.Namespace, pod.Name, pod.Spec.NodeName)
+			}
+		} else {
 			resizedPod, err = sched.assumeResizedPod(pod)
+			/** Following glog.Infof introduced for debug - KR **/
+			/** Added for debug - KR **/
+			nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
+			sched.config.SchedulerCache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod, false)
+			n, ok := nodeInfoMap[pod.Spec.NodeName]
+			if !ok {
+				glog.Infof(" Unable to find node in cache for pod %v !", pod.Name)
+			} else {
+				glog.Infof("node stats for %v after assumeResizedPod: %v", pod.Spec.NodeName, n.String())
+			}
 			if err != nil {
 				return
 			}
 		}
-
 		go func() {
 			err := sched.do_resize(pod, resizedPod, &v1.Resizing{
 				ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
 				Request:    pod.Spec.ResizeRequest,
 			})
+			/** Following glog.Infof introduced for debug - KR **/
+			nodeInfoMap := make(map[string]*schedulercache.NodeInfo, 1)
+			sched.config.SchedulerCache.GetNodeNameToInfoMapforResizing(nodeInfoMap, pod, false)
+			n, ok := nodeInfoMap[pod.Spec.NodeName]
+
+			if !ok {
+				glog.Infof(" Unable to find node in cache for pod %v !", pod.Name)
+			} else {
+				glog.Infof("node stats for %v after do_resize: %v", pod.Spec.NodeName, n.String())
+			}
 			if err != nil {
 				glog.Errorf("Internal error resizing pod: (%v)", err)
 			}

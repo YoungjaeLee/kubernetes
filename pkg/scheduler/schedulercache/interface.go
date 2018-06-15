@@ -121,5 +121,5 @@ type Cache interface {
 
 	AssumeResizedPod(oldPod, newPod *v1.Pod) error
 	ForgetResizedPod(oldPod, newPod *v1.Pod) error
-	GetNodeNameToInfoMapforResizing(nodeNameToInfo map[string]*NodeInfo, pod *v1.Pod) error
+	GetNodeNameToInfoMapforResizing(nodeNameToInfo map[string]*NodeInfo, pod *v1.Pod, resize bool) error
 }

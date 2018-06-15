@@ -64,6 +64,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
+/** Added below for Debug - KR **/
+import "runtime/debug"
 
 const (
 	initialGetBackoff = 100 * time.Millisecond
@@ -610,10 +612,13 @@ func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 		glog.Errorf("cannot convert newObj to *v1.Pod: %v", newObj)
 		return
 	}
-
+	/** Below Infof added for debug -- KR **/
+	glog.Infof("Before UpdatePod in updatePodInCache")
 	if err := c.schedulerCache.UpdatePod(oldPod, newPod); err != nil {
 		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
+	debug.PrintStack()
+	glog.Infof("After UpdatePod in updatePodInCache")
 
 	c.invalidateCachedPredicatesOnUpdatePod(newPod, oldPod)
 	c.podQueue.AssignedPodUpdated(newPod)
